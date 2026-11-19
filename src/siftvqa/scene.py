@@ -22,8 +22,16 @@ def sample_scene(cfg, rng, scene_id):
     n = rng.randint(cfg["min_objects"], cfg["max_objects"])
     W = cfg["image_size"]
     lo, hi = cfg["size_range"]
+    pal = cfg["palette"]
+    colors = rng.sample(cfg["colors"], rng.randint(*pal["n_colors"]))
+    shapes = rng.sample(cfg["shapes"], rng.randint(*pal["n_shapes"]))
+    focus = (rng.choice(colors), rng.choice(shapes))
     objs = []
     for _ in range(n):
+        if rng.random() < pal["p_focus"]:
+            color, shape = focus
+        else:
+            color, shape = rng.choice(colors), rng.choice(shapes)
         for _attempt in range(1000):
             size = rng.randint(lo, hi)
             x = rng.randint(int(BOUND * size) + 1, W - int(BOUND * size) - 2)
@@ -40,8 +48,8 @@ def sample_scene(cfg, rng, scene_id):
         objs.append(
             {
                 "id": len(objs),
-                "shape": rng.choice(cfg["shapes"]),
-                "color": rng.choice(cfg["colors"]),
+                "shape": shape,
+                "color": color,
                 "x": x,
                 "y": y,
                 "size": size,

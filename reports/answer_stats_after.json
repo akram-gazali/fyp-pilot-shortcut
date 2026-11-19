@@ -1,0 +1,42 @@
+{
+  "compare_cs": {
+    "n": 2003,
+    "dist": {
+      "no": 1039,
+      "yes": 964
+    },
+    "majority_answer": "no",
+    "majority_baseline": 0.5187
+  },
+  "compare_shape": {
+    "n": 2040,
+    "dist": {
+      "no": 1040,
+      "yes": 1000
+    },
+    "majority_answer": "no",
+    "majority_baseline": 0.5098
+  },
+  "count_cs": {
+    "n": 1978,
+    "dist": {
+      "0": 693,
+      "1": 577,
+      "2": 345,
+      "3": 200,
+      "4": 107,
+      "5": 56
+    },
+    "majority_answer": "0",
+    "majority_baseline": 0.3504
+  },
+  "exists_cs": {
+    "n": 1979,
+    "dist": {
+      "no": 1005,
+      "yes": 974
+    },
+    "majority_answer": "no",
+    "majority_baseline": 0.5078
+  }
+}

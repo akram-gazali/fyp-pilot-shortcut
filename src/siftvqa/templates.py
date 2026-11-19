@@ -1,6 +1,7 @@
 """Question templates. Each template builds a *program*; the English question is
 generated from the program (never the other way round)."""
 from . import dsl
+from .executor import answer_to_str, execute
 
 TEMPLATES = ["count_cs", "exists_cs", "compare_shape", "compare_cs"]
 
@@ -51,27 +52,36 @@ def question_text(p):
     raise ValueError(p)
 
 
-def sample_params(template, scene, cfg, rng):
-    """Pick template parameters. With prob p_target_present the asked colour+shape
-    occurs in the scene (for exists: 'yes'-type); otherwise it is chosen to be absent
-    when possible. Answer-value balance is handled later by quotas, not here."""
+def _candidates(template, cfg):
     colors, shapes = cfg["colors"], cfg["shapes"]
-    present = sorted({(o["color"], o["shape"]) for o in scene["objects"]})
-    absent = [(c, s) for c in colors for s in shapes if (c, s) not in present]
-
-    def pick_cs():
-        if rng.random() < cfg["p_target_present"] or not absent:
-            return rng.choice(present)
-        return rng.choice(absent)
-
     if template in ("count_cs", "exists_cs"):
-        c, s = pick_cs()
-        return {"color": c, "shape": s}
+        return [{"color": c, "shape": s} for c in colors for s in shapes]
     if template == "compare_shape":
-        a, b = rng.sample(shapes, 2)
-        return {"shape_a": a, "shape_b": b}
+        return [{"shape_a": a, "shape_b": b} for a in shapes for b in shapes if a != b]
     if template == "compare_cs":
-        c, a = pick_cs()
-        b = rng.choice([s for s in shapes if s != a])
-        return {"color": c, "shape_a": a, "shape_b": b}
+        return [
+            {"color": c, "shape_a": a, "shape_b": b}
+            for c in colors for a in shapes for b in shapes if a != b
+        ]
     raise ValueError(template)
+
+
+def sample_params(template, scene, cfg, rng):
+    """Choose the desired answer class first, then a parameter that gives it.
+
+    count_cs: answer class uniform over the feasible values in 0..count_max_target.
+    exists_cs / compare_*: "yes" with probability p_yes (falls back to the other class
+    if the scene cannot give the wanted one). Answer balance is on purpose, not luck.
+    """
+    by_answer = {}
+    for params in _candidates(template, cfg):
+        a = answer_to_str(execute(build_program(template, params), scene))
+        by_answer.setdefault(a, []).append(params)
+    if template == "count_cs":
+        feasible = sorted(a for a in by_answer if int(a) <= cfg["count_max_target"])
+        wanted = rng.choice(feasible)
+    else:
+        wanted = "yes" if rng.random() < cfg["p_yes"] else "no"
+        if wanted not in by_answer:
+            wanted = "no" if wanted == "yes" else "yes"
+    return rng.choice(by_answer[wanted])

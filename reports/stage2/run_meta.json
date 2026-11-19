@@ -1,0 +1,29 @@
+{
+  "config": {
+    "shortcuts": [
+      {
+        "name": "count_ignore_color",
+        "rule": "drop_color",
+        "template": "count_cs"
+      },
+      {
+        "name": "count_ignore_shape",
+        "rule": "drop_shape",
+        "template": "count_cs"
+      },
+      {
+        "name": "exists_ignore_color",
+        "rule": "drop_color",
+        "template": "exists_cs"
+      }
+    ]
+  },
+  "git": {
+    "commit": "e9d9a479581a25ef33cc0ec1eaf8cb6c1eeb04b3",
+    "dirty": true
+  },
+  "python": "3.12.16",
+  "shortcuts_sha256": "052409a14a9f708afd9588082c4a7a4e349096cf455b80e7c3d56c0d5944cb79",
+  "stage": "2-score",
+  "written_utc": "2026-11-19T11:11:47+00:00"
+}

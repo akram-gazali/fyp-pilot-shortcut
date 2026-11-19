@@ -1,0 +1,14 @@
+# FROZEN shortcut programs (pilot default; final lock is 20 January).
+# Each shortcut is a plausible wrong rule, written as a transformation of the intended
+# program: "drop_color" removes the colour filter, "drop_shape" removes the shape filter.
+# The file's SHA-256 is stored in every manifest. Add no others.
+shortcuts:
+  - name: count_ignore_color     # "how many blue squares?" -> count of all squares
+    template: count_cs
+    rule: drop_color
+  - name: count_ignore_shape     # "how many blue squares?" -> count of all blue objects
+    template: count_cs
+    rule: drop_shape
+  - name: exists_ignore_color    # "is there a red circle?" -> "is there any circle?"
+    template: exists_cs
+    rule: drop_color
