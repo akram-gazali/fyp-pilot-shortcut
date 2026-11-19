@@ -7,5 +7,15 @@
 #                      selection varies only over count_cs.
 exists_mode: stratified_quota
 # Answer quotas apply inside the d=1 count examples: the shortcut-aware arm must reproduce
-# the answer-value mix (0..5) that matched random has, so d=1 cannot buy a label shift.
+# the answer-value mix that matched random has, so d=1 cannot buy a label shift.
 count_answer_quota: true
+
+budget: 400                       # examples per arm
+template_shares:                  # of the budget; compare_shape is always a fixed shared base
+  count_cs: 0.4
+  exists_cs: 0.4
+  compare_shape: 0.2
+exists_yes_share: 0.5             # stratified_quota: share of "yes" among the exists examples
+match_n_objects: true             # matched random also matches the object-count bucket mix
+n_objects_buckets: [[3, 4], [5, 6], [7, 8]]
+seeds: [0, 1, 2]                  # selection seeds (>=3 for shortcut-aware vs matched random)

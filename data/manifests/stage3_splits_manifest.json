@@ -1,0 +1,26 @@
+{
+  "stage": "3-splits",
+  "held_out_template": "compare_cs",
+  "held_out_signature": "gt(count(fc(fs(S))),count(fs(S)))",
+  "shortcuts_sha256": "052409a14a9f708afd9588082c4a7a4e349096cf455b80e7c3d56c0d5944cb79",
+  "splits_config_sha256": "e6b8ae32f895762220cbea3c232896a14d3c21a37f449917f3151109de216099",
+  "generator_config_sha256": "372ed56b10ce753513b2587ec0b718796ac8e14b51df6ce002c1b2f6c9957456",
+  "questions_sha256": "e0143dbbc3bcbc863a324d6dc4dfd77a6f3f3824f2d366c0720d507090ff408d",
+  "train_sha256": "a984431f7e5f4f2abbe96d96024d9a80cf761b1499a55fb2ed959cdb0fef8889",
+  "pool_sha256": "2254e6f0e475a391f0a0d400c1cd5933e75bbcf44cdc11b0f40ed2bd3546e8f5",
+  "test_sha256": "666a06a85d92b79f33edfda488f60e5068d0ac5ea37b7963f8eebb9a011453d3",
+  "sizes": {
+    "train": {
+      "scenes": 500,
+      "questions": 766
+    },
+    "pool": {
+      "scenes": 3000,
+      "questions": 4490
+    },
+    "test": {
+      "scenes": 500,
+      "questions": 2000
+    }
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "n_test_questions": 2000,
+  "n_paired": 1633,
+  "n_without_valid_pair": {
+    "compare_cs": 145,
+    "compare_shape": 143,
+    "count_cs": 6,
+    "exists_cs": 73
+  },
+  "edit_kinds": {
+    "irrelevant:add": 246,
+    "irrelevant:move": 303,
+    "irrelevant:recolor": 280,
+    "irrelevant:remove": 261,
+    "irrelevant:reshape": 254,
+    "irrelevant:resize": 289,
+    "relevant:add": 159,
+    "relevant:multi": 541,
+    "relevant:recolor": 425,
+    "relevant:remove": 148,
+    "relevant:reshape": 360
+  },
+  "audit_mismatches_on_edited_images": 0,
+  "audit_examples": [],
+  "relevant_answer_changed": 1633,
+  "irrelevant_answer_same": 1633
+}

@@ -1,0 +1,98 @@
+{
+  "pilot_note": "pilot numbers; model-free checks only",
+  "split_sizes": {
+    "train": {
+      "scenes": 500,
+      "questions": 766
+    },
+    "pool": {
+      "scenes": 3000,
+      "questions": 4490
+    },
+    "test": {
+      "scenes": 500,
+      "questions": 2000
+    }
+  },
+  "held_out_questions_dropped_from_train_pool": {
+    "train": 234,
+    "pool": 1510
+  },
+  "signature_overlap": {
+    "signature_counts_by_split": {
+      "train": {
+        "exists(fc(fs(S)))": 249,
+        "count(fc(fs(S)))": 263,
+        "gt(count(fs(S)),count(fs(S)))": 254
+      },
+      "pool": {
+        "count(fc(fs(S)))": 1514,
+        "exists(fc(fs(S)))": 1480,
+        "gt(count(fs(S)),count(fs(S)))": 1496
+      },
+      "test": {
+        "count(fc(fs(S)))": 500,
+        "exists(fc(fs(S)))": 500,
+        "gt(count(fs(S)),count(fs(S)))": 500,
+        "gt(count(fc(fs(S))),count(fs(S)))": 500
+      }
+    },
+    "held_out_signature": "gt(count(fc(fs(S))),count(fs(S)))",
+    "held_out_in_train": 0,
+    "held_out_in_pool": 0,
+    "held_out_in_test": 500,
+    "seen_signatures_in_test_missing_from_train": []
+  },
+  "scene_group_overlap_counts": {
+    "train&pool": 0,
+    "train&test": 0,
+    "pool&test": 0
+  },
+  "duplicate_scenes": {
+    "exact_duplicate_scenes_within_split": 0,
+    "exact_duplicate_scenes_across_splits": 0,
+    "attribute_multisets_shared_across_splits_(info_only)": 310,
+    "attribute_multisets_total": 2269
+  },
+  "duplicate_questions_across_splits": 0,
+  "question_only_baseline": {
+    "per_template_majority": {
+      "seen_acc_pct": 44.3,
+      "held_out_acc_pct": 50.8,
+      "n_seen": 1500,
+      "n_held_out": 500
+    },
+    "per_template_and_params_majority": {
+      "seen_acc_pct": 42.8,
+      "held_out_acc_pct": 52.0,
+      "n_seen": 1500,
+      "n_held_out": 500
+    }
+  },
+  "shuffled_scene_oracle_acc_pct": {
+    "seen": 43.4,
+    "held_out": 50.8
+  },
+  "test_answer_dist_by_template": {
+    "count_cs": {
+      "0": 156,
+      "1": 152,
+      "2": 49,
+      "3": 49,
+      "4": 49,
+      "5": 45
+    },
+    "exists_cs": {
+      "no": 256,
+      "yes": 244
+    },
+    "compare_shape": {
+      "no": 247,
+      "yes": 253
+    },
+    "compare_cs": {
+      "no": 254,
+      "yes": 246
+    }
+  }
+}

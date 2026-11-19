@@ -1,0 +1,10 @@
+# Pilot split settings (not final until the protocol lock).
+seed: 0
+n_train_scenes: 500
+n_pool_scenes: 3000
+n_test_scenes: 500
+# The held-out operation combination: this signature never appears in train or the selection
+# pool, only in test. It is given as a template name; its program signature is derived from it.
+held_out_template: compare_cs
+# Test questions: one question per template per test scene (gives ~500 held-out questions).
+test_questions_per_template_per_scene: 1

@@ -1,0 +1,12 @@
+{
+  "stage": "3-edits",
+  "test_edits_sha256": "c715afccadd78413cd218b8a2df05b2bd853a0356b01da9889152eebe51622a2",
+  "n_test_questions": 2000,
+  "n_paired": 1633,
+  "n_without_valid_pair": {
+    "compare_cs": 145,
+    "compare_shape": 143,
+    "count_cs": 6,
+    "exists_cs": 73
+  }
+}

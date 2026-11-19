@@ -75,3 +75,20 @@ def render(scene):
         else:  # triangle
             d.polygon([(x, y - s), (x - s, y + s), (x + s, y + s)], fill=fill)
     return img
+
+
+def place(objs, size, cfg, rng, skip_id=None, tries=500):
+    """Find a free position for an object of this size (used by the test-set edit generator).
+    Same non-overlap rule as sample_scene. Returns (x, y) or None."""
+    W = cfg["image_size"]
+    m = int(BOUND * size)
+    for _ in range(tries):
+        x = rng.randint(m + 1, W - m - 2)
+        y = rng.randint(m + 1, W - m - 2)
+        if all(
+            o["id"] == skip_id
+            or (x - o["x"]) ** 2 + (y - o["y"]) ** 2 >= (BOUND * (size + o["size"]) + cfg["placement_margin"]) ** 2
+            for o in objs
+        ):
+            return x, y
+    return None

@@ -1,0 +1,45 @@
+{
+  "config": {
+    "selection": {
+      "budget": 400,
+      "count_answer_quota": true,
+      "exists_mode": "stratified_quota",
+      "exists_yes_share": 0.5,
+      "match_n_objects": true,
+      "n_objects_buckets": [
+        [
+          3,
+          4
+        ],
+        [
+          5,
+          6
+        ],
+        [
+          7,
+          8
+        ]
+      ],
+      "seeds": [
+        0,
+        1,
+        2
+      ],
+      "template_shares": {
+        "compare_shape": 0.2,
+        "count_cs": 0.4,
+        "exists_cs": 0.4
+      }
+    }
+  },
+  "git": {
+    "commit": "9866791cc663eb8af58870d8a7510257c433d9f4",
+    "dirty": true
+  },
+  "pool_sha256": "2254e6f0e475a391f0a0d400c1cd5933e75bbcf44cdc11b0f40ed2bd3546e8f5",
+  "python": "3.12.16",
+  "selection_config_sha256": "374a9284d955c3dfb63027cb4b3b845b3c8c4cf13c46cd48a136d24f495cebc6",
+  "shortcuts_sha256": "052409a14a9f708afd9588082c4a7a4e349096cf455b80e7c3d56c0d5944cb79",
+  "stage": "3-selection",
+  "written_utc": "2026-11-19T11:33:53+00:00"
+}
