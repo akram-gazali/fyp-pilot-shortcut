@@ -21,6 +21,9 @@ python3.12 -m venv .venv && .venv/bin/pip install -r requirements.txt
 .venv/bin/python scripts/run_selectors.py         # Stage 3: four selectors x 3 seeds x both exists modes
 .venv/bin/python scripts/make_stage3_summary.py   # reports/stage3_summary.md
 ```
+Stage 4 (GPU, Colab): see `colab/COLAB_STEPS.md`. CPU-side: `scripts/power_calc.py` writes the held-out test-size proposal
+(`reports/stage4_test_size_proposal.md`). Stage 4 code is written but not yet run on a GPU.
+
 Optional: `scripts/tune_generator.py` (generator tuning on separate seeds, no rendering).
 
 ## Layout
