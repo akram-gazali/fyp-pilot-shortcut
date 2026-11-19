@@ -20,10 +20,14 @@ templates:
 # each object is the scene's "focus" colour+shape pair with probability p_focus, so that a
 # queried pair often appears several times (answers spread over 0..5).
 palette:
-  n_colors: [2, 3]
-  n_shapes: [2, 3]
-  p_focus: 0.4
+  n_colors: {1: 0.2, 2: 0.5, 3: 0.3}   # number of distinct colours in a scene: weight
+  n_shapes: {1: 0.05, 2: 0.45, 3: 0.5}   # number of distinct shapes in a scene: weight
+  p_focus: 0.7
 # Question targets are chosen on purpose: pick a desired answer class first, then a
 # colour/shape parameter that gives it (when the scene allows it).
+count_zero_weight: 0.5   # sampling weight of answer class 0 relative to 1..5 (1.0 = equal)
 count_max_target: 5       # count answers are targeted uniformly over feasible values in 0..5
 p_yes: 0.5                # target share of "yes" for exists_cs, compare_shape, compare_cs
+
+# Tuned with scripts/tune_generator.py on tuning seeds 1000/2000 (not the pool seed) so that each
+# shortcut agrees with the intended answer on ~60-75% of the count/exists questions it applies to.

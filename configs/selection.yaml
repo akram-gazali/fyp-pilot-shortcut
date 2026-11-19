@@ -1,0 +1,11 @@
+# Selection settings (pilot defaults, not final).
+# exists_mode controls how exists_cs examples enter the arms:
+#   stratified_quota   (Option A): exists is selected inside the label quota. The shortcut-aware
+#                      arm takes d=1 examples (all answer "no") and fills the "yes" quota with
+#                      d=0 examples; matched random gets the identical yes/no counts.
+#   fixed_shared_base  (Option B): exists examples are one fixed set shared by every arm;
+#                      selection varies only over count_cs.
+exists_mode: stratified_quota
+# Answer quotas apply inside the d=1 count examples: the shortcut-aware arm must reproduce
+# the answer-value mix (0..5) that matched random has, so d=1 cannot buy a label shift.
+count_answer_quota: true

@@ -44,3 +44,10 @@ def test_no_shortcut_for_comparisons():
 
 def test_only_three_frozen_shortcuts():
     assert len(load_shortcuts(ROOT / "configs" / "shortcuts.yaml")) == 3
+
+
+def test_selection_config_switch_is_valid():
+    from siftvqa.config import load_config
+    cfg = load_config(ROOT / "configs" / "selection.yaml")
+    assert cfg["exists_mode"] in ("stratified_quota", "fixed_shared_base")
+    assert cfg["count_answer_quota"] is True

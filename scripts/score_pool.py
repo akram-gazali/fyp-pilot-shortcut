@@ -9,7 +9,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 from siftvqa import dsl
-from siftvqa.config import ROOT, sha256_file
+from siftvqa.config import ROOT, load_config, sha256_file
 from siftvqa.runmeta import write_run_meta
 from siftvqa.shortcuts import load_shortcuts, score_question
 
@@ -134,6 +134,23 @@ def main():
         "corr_d_vs_n_objects_(shortcut-applicable)": point_biserial([r["d"] for r in app], [r["n_objects"] for r in app]),
         "corr_d_vs_program_length_(shortcut-applicable)": point_biserial([r["d"] for r in app], [r["program_length"] for r in app]),
         "program_length_by_template": {t: sorted({r["program_length"] for r in rows if r["template"] == t}) for t in templates},
+    }
+
+    # --- combined count+exists view, and what the quotas can draw from
+    ce = [r for r in rows if r["shortcuts"]]
+    rep["combined_count_exists"] = {
+        "n": len(ce), "d1": sum(r["d"] for r in ce), "d1_pct": pct(sum(r["d"] for r in ce), len(ce)),
+        "agree_pct_any_shortcut_free": pct(sum(1 - r["d"] for r in ce), len(ce)),
+    }
+    ex_rows = [r for r in rows if r["template"] == "exists_cs"]
+    cnt_d1 = [r for r in rows if r["template"] == "count_cs" and r["d"]]
+    rep["quota_feasibility"] = {
+        "exists_mode": load_config(ROOT / "configs" / "selection.yaml")["exists_mode"],
+        "count_d1_available_by_answer": dict(sorted(Counter(r["answer"] for r in cnt_d1).items())),
+        "count_answer_dist_all": dict(sorted(Counter(r["answer"] for r in rows if r["template"] == "count_cs").items())),
+        "exists_d1_no": sum(r["d"] for r in ex_rows),
+        "exists_d0_no": sum(1 for r in ex_rows if not r["d"] and r["answer"] == "no"),
+        "exists_d0_yes": sum(1 for r in ex_rows if not r["d"] and r["answer"] == "yes"),
     }
 
     out = ROOT / "reports"

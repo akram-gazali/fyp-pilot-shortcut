@@ -79,7 +79,9 @@ def sample_params(template, scene, cfg, rng):
         by_answer.setdefault(a, []).append(params)
     if template == "count_cs":
         feasible = sorted(a for a in by_answer if int(a) <= cfg["count_max_target"])
-        wanted = rng.choice(feasible)
+        # answer 0 is always feasible and would dominate; its weight is a config knob
+        weights = [cfg.get("count_zero_weight", 1.0) if a == "0" else 1.0 for a in feasible]
+        wanted = rng.choices(feasible, weights)[0]
     else:
         wanted = "yes" if rng.random() < cfg["p_yes"] else "no"
         if wanted not in by_answer:

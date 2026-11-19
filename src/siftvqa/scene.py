@@ -23,8 +23,11 @@ def sample_scene(cfg, rng, scene_id):
     W = cfg["image_size"]
     lo, hi = cfg["size_range"]
     pal = cfg["palette"]
-    colors = rng.sample(cfg["colors"], rng.randint(*pal["n_colors"]))
-    shapes = rng.sample(cfg["shapes"], rng.randint(*pal["n_shapes"]))
+    # n_colors / n_shapes: {how many distinct values the scene uses: sampling weight}
+    nc = rng.choices(list(pal["n_colors"]), list(pal["n_colors"].values()))[0]
+    ns = rng.choices(list(pal["n_shapes"]), list(pal["n_shapes"].values()))[0]
+    colors = rng.sample(cfg["colors"], int(nc))
+    shapes = rng.sample(cfg["shapes"], int(ns))
     focus = (rng.choice(colors), rng.choice(shapes))
     objs = []
     for _ in range(n):

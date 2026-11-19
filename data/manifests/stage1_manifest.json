@@ -2,13 +2,13 @@
   "stage": "1",
   "n_scenes": 4000,
   "n_questions": 8000,
-  "questions_sha256": "5c1e9fddf3f4d69f67b9ee5ca20e842f57b2b7eed37454aad1ef1d152c5e3548",
-  "generator_config_sha256": "8c21eec0edb5de7a5ac128a716569fc51504039d0572139ad0db458c93f818ee",
+  "questions_sha256": "e0143dbbc3bcbc863a324d6dc4dfd77a6f3f3824f2d366c0720d507090ff408d",
+  "generator_config_sha256": "372ed56b10ce753513b2587ec0b718796ac8e14b51df6ce002c1b2f6c9957456",
   "template_counts": {
-    "count_cs": 1978,
-    "compare_cs": 2003,
-    "exists_cs": 1979,
-    "compare_shape": 2040
+    "count_cs": 2032,
+    "exists_cs": 1954,
+    "compare_cs": 1997,
+    "compare_shape": 2017
   },
   "label_audit_mismatches": 0
 }
