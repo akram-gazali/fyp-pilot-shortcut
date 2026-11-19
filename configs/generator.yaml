@@ -1,0 +1,20 @@
+# Pilot defaults. NOT final until the protocol lock on 20 January.
+seed: 0
+image_size: 224
+shapes: [square, circle, triangle]
+colors: [red, blue, green, yellow, purple, orange]
+min_objects: 3
+max_objects: 8
+size_range: [10, 18]      # half-extent in pixels
+placement_margin: 3       # min gap (px) between bounding circles
+# One scene = one scene group. Splits (Stage 3) assign whole scenes to train/pool/test.
+n_scenes: 4000            # ~500 train + ~3000 pool + ~500 test
+questions_per_scene: 2
+# Template sampling weights (all four are generated; Stage 3 decides which are held out).
+templates:
+  count_cs: 1.0           # "How many blue squares are there?"
+  exists_cs: 1.0          # "Is there a red circle?"
+  compare_shape: 1.0      # "Are there more squares than triangles?"
+  compare_cs: 1.0         # "Are there more blue squares than triangles?" (held-out combination)
+# Probability the asked colour+shape actually occurs in the scene (avoids all-zero / all-"no" answers).
+p_target_present: 0.7
