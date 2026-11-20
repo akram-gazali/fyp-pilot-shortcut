@@ -65,3 +65,33 @@ def test_requirements_gpu_has_pins():
     assert {"transformers", "peft"} <= set(formats.parse_pins((ROOT / "requirements-gpu.txt").read_text()))
 
 
+
+
+def _script():
+    import importlib.util
+    from pathlib import Path
+    spec = importlib.util.spec_from_file_location("s5script", Path(__file__).resolve().parents[1] / "colab" / "stage4_feasibility.py")
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
+
+def test_joint_score_computable_for_a_trained_arm_eval():
+    """The per-arm eval items include both edited images; a predictor yields the joint score (the primary metric)."""
+    m = _script()
+    rows = [{"qid": "q1", "scene_id": "s1", "template": "compare_cs", "question": "Q?", "answer": "yes"},
+            {"qid": "q2", "scene_id": "s2", "template": "exists_cs", "question": "Q2?", "answer": "no"}]
+    edits = [{"qid": "q1", "scene_id": "s1", "template": "compare_cs", "relevant_scene": "q1__rel", "irrelevant_scene": "q1__irr",
+              "answers": {"original": "yes", "relevant": "no", "irrelevant": "yes"}},
+             {"qid": "q2", "scene_id": "s2", "template": "exists_cs", "relevant_scene": "q2__rel", "irrelevant_scene": "q2__irr",
+              "answers": {"original": "no", "relevant": "yes", "irrelevant": "no"}}]
+    items = [m.eval_item(r["qid"], "p", r, r["answer"]) for r in rows] + m.edit_items(edits, {r["qid"]: r for r in rows})
+    assert [i["key"] for i in items] == ["q1", "q2", "q1__rel", "q1__irr", "q2__rel", "q2__irr"]
+    perfect = {i["key"]: i["truth"] for i in items}
+    j = m.joint_report(edits, perfect, "compare_cs")
+    assert j["held_out"]["joint_pct"] == 100.0 and j["seen"]["joint_pct"] == 100.0
+    # a model that ignores the edit (answers the original answer on the relevant image) fails the joint score only
+    blind = dict(perfect, q1__rel="yes")
+    jb = m.joint_report(edits, blind, "compare_cs")
+    assert jb["held_out"]["joint_pct"] == 0.0 and jb["held_out"]["original_pct"] == 100.0 and jb["held_out"]["relevant_edit_pct"] == 0.0
+    assert jb["seen"]["joint_pct"] == 100.0

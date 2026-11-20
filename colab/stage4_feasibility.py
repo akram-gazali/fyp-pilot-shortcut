@@ -358,6 +358,21 @@ def cmd_dev_format(args):
 
 
 # ----------------------------------------------------------------------------- zero-shot on the test set
+def eval_item(key, path, q, truth):
+    return {"key": key, "path": path, "question": q["question"], "template": q["template"], "truth": truth}
+
+
+def edit_items(edits, qrow):
+    """Items for the paired-edit (joint) score: the relevant and the irrelevant edited image of each edit record.
+    The original question is scored from the ordinary item for the same qid."""
+    items = []
+    for e in edits:
+        q = qrow[e["qid"]]
+        items.append(eval_item(e["relevant_scene"], img_path(e["relevant_scene"], True), q, e["answers"]["relevant"]))
+        items.append(eval_item(e["irrelevant_scene"], img_path(e["irrelevant_scene"], True), q, e["answers"]["irrelevant"]))
+    return items
+
+
 def cmd_zero_shot(args):
     preflight(args)
     out = Path(args.out)
@@ -372,14 +387,9 @@ def cmd_zero_shot(args):
     edits = [e for e in edits if e["qid"] in keep]
     qrow = {r["qid"]: r for r in test}
 
-    def item(key, path, q, truth):
-        return {"key": key, "path": path, "question": q["question"], "template": q["template"], "truth": truth}
-
+    item = eval_item
     items = [item(r["qid"], img_path(r["scene_id"]), r, r["answer"]) for r in test]
-    for e in edits:
-        q = qrow[e["qid"]]
-        items.append(item(e["relevant_scene"], img_path(e["relevant_scene"], True), q, e["answers"]["relevant"]))
-        items.append(item(e["irrelevant_scene"], img_path(e["irrelevant_scene"], True), q, e["answers"]["irrelevant"]))
+    items += edit_items(edits, qrow)
     shuf = []
     if not args.skip_shuffle:       # model-based shuffled-image baseline: right question, a DIFFERENT scene's image
         rng = random.Random(1)
@@ -530,7 +540,14 @@ def cmd_cost(args):
     n_test = len(read_jsonl(SPL / "test.jsonl"))
     n_pairs = len(read_jsonl(SPL / "test_edits.jsonl")) if (SPL / "test_edits.jsonl").exists() else 0
     n_eval = n_test + 2 * n_pairs + n_test       # originals + edits + shuffled-image pass
-    sps = c["sec_per_step_incl_preprocess"]
+    sps, sps_src = c["sec_per_step_incl_preprocess"], f"grid ({c['resolution']} px, batch {c['batch']}, 5 timed steps)"
+    tiny = out / "tiny_finetune.json"
+    if tiny.exists():                      # a real 100-step training run is a better step time than 5 grid steps
+        tj = json.load(open(tiny))
+        arms = [a for a in tj["arms"].values() if a.get("steps")]
+        if arms and tj.get("resolution") == c["resolution"] and args.tiny_bs == c["batch"]:
+            sps = round(sum(a["train_seconds"] for a in arms) / sum(a["steps"] for a in arms), 4)
+            sps_src = f"measured in tiny-finetune ({len(arms)} arms, {sum(a['steps'] for a in arms)} steps, {c['resolution']} px, batch {c['batch']})"
     scen = [{"name": "pilot tiny fine-tune (400 ex, 1 epoch, 4 arms x 1 seed)", "n_train": 400, "epochs": 1, "runs": 4},
             {"name": "400 ex, 3 epochs, 4 arms x 1 seed", "n_train": 400, "epochs": 3, "runs": 4},
             {"name": "400 ex, 3 epochs, shortcut+random x3 seeds, difficulty+diversity x1", "n_train": 400, "epochs": 3, "runs": 8},
@@ -547,7 +564,8 @@ def cmd_cost(args):
         res_rows.append(r)
     prev = ROOT / "reports" / "stage4" / "cost_extrapolation.json"
     rep = {"PILOT_NOTE": "extrapolation from measured step time; ASSUMED parts are labelled",
-           "based_on": {"resolution": c["resolution"], "batch": c["batch"], "sec_per_step": sps, "peak_mem_gb": c["peak_mem_gb"],
+           "based_on": {"resolution": c["resolution"], "batch": c["batch"], "sec_per_step": sps, "sec_per_step_source": sps_src,
+                        "grid_sec_per_step_for_comparison": c["sec_per_step_incl_preprocess"], "peak_mem_gb": c["peak_mem_gb"],
                         "dtype": grid.get("dtype"), "sec_per_eval_example": spe, "sec_per_eval_example_source": src,
                         "eval_items_per_run": n_eval, "gpu": grid["env"].get("gpu")},
            "budget_hours": args.budget_hours, "scenarios": res_rows,
@@ -571,11 +589,16 @@ def cmd_tiny(args):
     held = rng.sample([r for r in test if r["template"] == HELD_OUT], args.tiny_eval_n)
     seen = rng.sample([r for r in test if r["template"] != HELD_OUT], args.tiny_eval_n)
     evalrows = held + seen
-    items = [{"key": r["qid"], "path": img_path(r["scene_id"]), "question": r["question"], "template": r["template"],
-              "truth": r["answer"]} for r in evalrows]
+    items = [eval_item(r["qid"], img_path(r["scene_id"]), r, r["answer"]) for r in evalrows]
+    # paired edits of the sampled questions, so the PRIMARY metric (joint score) is computed for every trained arm
+    all_edits = read_jsonl(SPL / "test_edits.jsonl") if (SPL / "test_edits.jsonl").exists() else []
+    keep = {r["qid"] for r in evalrows}
+    tiny_edits = [e for e in all_edits if e["qid"] in keep]
+    items += edit_items(tiny_edits, {r["qid"]: r for r in evalrows})
     results = {"BANNER": "PIPELINE CHECK ONLY: one seed, tiny budget. This shows the code path runs end to end. "
                          "It is NOT evidence for or against the hypothesis; differences between arms are within noise.",
                "exists_mode": mode, "selection_manifest": mpath.name, "selection_manifest_sha256": sha256_file(mpath),
+               "eval_split": "test (200 questions sampled from data/splits/test.jsonl, seed 0, plus their paired edits)",
                "method": method, "resolution": res, "env": env_info(), "arms": {}}
     for arm, qids in man["arms"].items():                      # arms as written by run_selectors.py; checked before any GPU work
         missing = [q for q in qids if q not in pool]
@@ -583,7 +606,7 @@ def cmd_tiny(args):
         if missing or leak:
             raise SystemExit(f"arm {arm}: {len(missing)} qids missing from pool, {len(leak)} on test scenes")
     if args.dry_run:
-        print("dry-run: arms", {a: len(v) for a, v in man["arms"].items()}, "eval items", len(items), "manifest", mpath.name)
+        print("dry-run: arms", {a: len(v) for a, v in man["arms"].items()}, "eval items", len(items), "of which paired edits", 2 * len(tiny_edits), "manifest", mpath.name)
         return
     preflight(args)
     login_hf()
@@ -602,7 +625,8 @@ def cmd_tiny(args):
                                 "lora": lora_report(model),
                                 "loss_first10": round(sum(tr["losses"][:10]) / min(10, len(tr["losses"])), 4),
                                 "loss_last10": round(sum(tr["losses"][-10:]) / min(10, len(tr["losses"])), 4),
-                                "before": plain_accuracy_report(evalrows, norm0, HELD_OUT), "after": plain_accuracy_report(evalrows, norm1, HELD_OUT)}
+                                "before": plain_accuracy_report(evalrows, norm0, HELD_OUT), "after": plain_accuracy_report(evalrows, norm1, HELD_OUT),
+                                "joint_before": joint_report(tiny_edits, norm0, HELD_OUT), "joint_after": joint_report(tiny_edits, norm1, HELD_OUT)}
         jdump(Path(args.out) / "tiny_finetune.json", results)  # saved after EVERY arm: a lost session costs at most one arm
         del model
         torch.cuda.empty_cache()

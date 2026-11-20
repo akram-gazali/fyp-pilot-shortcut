@@ -136,7 +136,7 @@ def main():
     if co:
         b = co["based_on"]
         L += [f"Zero-shot eval speed {b['sec_per_eval_example']} s/example ({b['sec_per_eval_example_source']}). Budget {co['budget_hours']} GPU-hours. "
-              f"Extrapolation uses {b['resolution']} px, batch {b['batch']}, {b['sec_per_step']} s/step.", ""]
+              f"Extrapolation uses {b['resolution']} px, batch {b['batch']}, {b['sec_per_step']} s/step ({b.get('sec_per_step_source', 'grid')}; the grid timing was {b.get('grid_sec_per_step_for_comparison', 'n/a')} s/step).", ""]
         L += table(["scenario", "GPU-hours", "% of budget", "fits"], [[s["name"], s["total_gpu_hours"], s["share_of_budget_pct"], s["fits_budget"]] for s in co["scenarios"]])
         L += ["T4 numbers do not transfer to other GPUs. Test sizes 3x and 5x multiply the evaluation items per run (7,266 now).", ""]
         L += ["Platforms (torch labelled per platform; the full study runs on Kaggle only): " + "; ".join(
@@ -147,6 +147,23 @@ def main():
                 f"{o['name'][:40]}: {o['total_gpu_hours']} -> {n['total_gpu_hours']}" for o, n in zip(co["previous_stage4_scenarios_for_comparison"], co["scenarios"])), ""]
 
     pr = pw["proposal"]
+    ti = J(R / "stage5/tiny_finetune.json")
+    if ti:
+        L += ["## 7b. Tiny fine-tune (PIPELINE CHECK ONLY)", f"**{ti['BANNER']}**", "",
+              f"- Eval split: {ti.get('eval_split', 'the TEST split (200 questions: 100 held-out compare_cs, 100 seen, sampled from data/splits/test.jsonl, seed 0)')}. "
+              "Trained arms were therefore evaluated on test questions; see `PROTOCOL.md` for the disclosure.",
+              f"- Method `{ti['method']}`, {ti['resolution']} px, platform `{ti['env'].get('platform')}`, torch {ti['env'].get('torch')}, selection manifest `{ti['selection_manifest']}`. "
+              "Each arm: 400 training questions, 1 epoch, batch 4, seed 0.", ""]
+        rows = []
+        for a, v in ti["arms"].items():
+            jb, ja = v.get("joint_before"), v.get("joint_after")
+            jt = (f"{jb['held_out']['joint_pct']} -> {ja['held_out']['joint_pct']} (n={ja['held_out']['n_paired']})" if jb and ja else "not recorded in this run")
+            rows.append([a, v["steps"], v["train_seconds"], round(v["train_seconds"] / v["steps"], 3), f"{v['loss_first10']} -> {v['loss_last10']}",
+                         f"{v['before']['held_out_pct']} -> {v['after']['held_out_pct']}", f"{v['before']['seen_pct']} -> {v['after']['seen_pct']}", jt])
+        L += table(["arm", "steps", "train s", "s/step", "loss first10 -> last10", "plain held-out % (n=100)", "plain seen % (n=100)", "joint held-out % (primary)"], rows)
+        L += ["LoRA check (all arms): trainable dtypes `%s`, adapters inside the vision tower: %s." % (
+                sorted({d for v in ti["arms"].values() for d in v["lora"]["trainable_dtypes"]}), sorted({v["lora"]["lora_in_vision_tower"] for v in ti["arms"].values()})),
+              "Differences between arms are single-seed, n=100 per group and are not interpreted. Plain accuracy was near ceiling before training (see 6b).", ""]
     L += ["## 8. Held-out test-size proposal (power calculation; psi and seed sd are ASSUMED)",
           f"- Target: 3-point gain, alpha {pw['assumed_inputs']['alpha']}, power {pw['assumed_inputs']['power']}. Headline case `{pw['assumed_inputs']['headline_case']}`.",
           f"- Needed: {pr['plain_questions_needed']} plain questions, {pr['joint_paired_questions_needed']} paired questions, i.e. {pr['held_out_test_scenes_proposed']} held-out scenes (now 500; {pr['scenes_needed_if_paired_coverage_were_0.9']} if paired coverage were 0.9).",
@@ -162,7 +179,8 @@ def main():
           ("4. **GPU budget.** " + (("Scenarios over the %s GPU-hour budget: %s." % (co["budget_hours"], ", ".join(s["name"] for s in co["scenarios"] if not s["fits_budget"]) or "none"))
                                     if co else "no cost file") + " Largest scenario: %s GPU-hours. See section 7." % (max(s["total_gpu_hours"] for s in co["scenarios"]) if co else "n/a")),
           "4b. **Headroom.** The frozen model is near ceiling on plain held-out accuracy (section 6b); the primary metric must be fixed in the protocol.",
-          "5. **Training code never run end to end on a GPU.** `tiny-finetune` is untested on a GPU. Stage 5 reviewed it (loss mask, fp32 LoRA adapters with fp16 GradScaler, seeds, manifest checks) with CPU tests only.",
+          ("5. **Training code.** " + ("`tiny-finetune` ran end to end on a Kaggle T4 (section 7b; pipeline check only, one seed, tiny budget). Its eval used test questions (disclosed in `PROTOCOL.md`)."
+                                       if ti else "`tiny-finetune` is untested on a GPU.") + " Joint score per arm is computed by the script from now on; the first tiny run recorded plain accuracy only."),
           ("6. **Answer format.** Fixed in Stage 5 (per-template instruction or choice scoring, chosen on the dev set); see sections 5b and 6." if stage5_zs else
           "6. **Answer-format failures.** Stage 4 outputs like `0` for yes/no questions were scored wrong; the Stage 5 fix is written but its GPU run is pending."),
           "7. **Synthetic-to-real gap and one operation combination.** One held-out combination (compare_cs) in simple 2D scenes; no claim beyond this pilot (not measured here).",

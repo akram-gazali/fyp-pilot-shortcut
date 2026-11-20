@@ -1,0 +1,202 @@
+{
+  "BANNER": "PIPELINE CHECK ONLY: one seed, tiny budget. This shows the code path runs end to end. It is NOT evidence for or against the hypothesis; differences between arms are within noise.",
+  "exists_mode": "stratified_quota",
+  "selection_manifest": "selection_stratified_quota_seed0.json",
+  "selection_manifest_sha256": "cb8e845f432396b62fad0856f097d3187ab9ac1c540121f2dd55272a4799d5b8",
+  "method": "choice",
+  "resolution": 224,
+  "env": {
+    "python": "3.13.16",
+    "platform": "kaggle",
+    "torch": "2.11.0+cu130",
+    "cuda": true,
+    "gpu": "Tesla T4",
+    "gpu_memory_gb": 14.6,
+    "compute_capability": "7.5",
+    "bf16_supported": true,
+    "transformers": "5.22.1",
+    "peft": "0.21.2"
+  },
+  "arms": {
+    "shortcut_aware": {
+      "n_train": 400,
+      "train_qids_sha": "16fc929f96dd56012d68ed4d99a8de7467bf128f01f3055a1f34c0e88e2cc44e",
+      "steps": 100,
+      "train_seconds": 120.9,
+      "dtype": "float16",
+      "lora": {
+        "n_trainable_tensors": 504,
+        "n_trainable_params": 29933568,
+        "trainable_dtypes": [
+          "torch.float32"
+        ],
+        "lora_in_vision_tower": 0
+      },
+      "loss_first10": 0.3936,
+      "loss_last10": 0.0812,
+      "before": {
+        "n_all": 200,
+        "all_pct": 94.0,
+        "seen_pct": 93.0,
+        "n_seen": 100,
+        "held_out_pct": 95.0,
+        "n_held_out": 100,
+        "by_template_pct": {
+          "compare_cs": 95.0,
+          "compare_shape": 95.0,
+          "count_cs": 85.29,
+          "exists_cs": 100.0
+        }
+      },
+      "after": {
+        "n_all": 200,
+        "all_pct": 96.0,
+        "seen_pct": 93.0,
+        "n_seen": 100,
+        "held_out_pct": 99.0,
+        "n_held_out": 100,
+        "by_template_pct": {
+          "compare_cs": 99.0,
+          "compare_shape": 100.0,
+          "count_cs": 79.41,
+          "exists_cs": 100.0
+        }
+      }
+    },
+    "matched_random": {
+      "n_train": 400,
+      "train_qids_sha": "115ada31cad0bff95ac83c587260397e035c118f71a586e66e11b390916f88cb",
+      "steps": 100,
+      "train_seconds": 125.4,
+      "dtype": "float16",
+      "lora": {
+        "n_trainable_tensors": 504,
+        "n_trainable_params": 29933568,
+        "trainable_dtypes": [
+          "torch.float32"
+        ],
+        "lora_in_vision_tower": 0
+      },
+      "loss_first10": 0.463,
+      "loss_last10": 0.0099,
+      "before": {
+        "n_all": 200,
+        "all_pct": 94.0,
+        "seen_pct": 93.0,
+        "n_seen": 100,
+        "held_out_pct": 95.0,
+        "n_held_out": 100,
+        "by_template_pct": {
+          "compare_cs": 95.0,
+          "compare_shape": 95.0,
+          "count_cs": 85.29,
+          "exists_cs": 100.0
+        }
+      },
+      "after": {
+        "n_all": 200,
+        "all_pct": 99.0,
+        "seen_pct": 99.0,
+        "n_seen": 100,
+        "held_out_pct": 99.0,
+        "n_held_out": 100,
+        "by_template_pct": {
+          "compare_cs": 99.0,
+          "compare_shape": 100.0,
+          "count_cs": 97.06,
+          "exists_cs": 100.0
+        }
+      }
+    },
+    "difficulty": {
+      "n_train": 400,
+      "train_qids_sha": "04362d66633e685fc7e6c8a9e290d7fc119a71c0a3ac5d10c80f09ca0db63e0b",
+      "steps": 100,
+      "train_seconds": 125.2,
+      "dtype": "float16",
+      "lora": {
+        "n_trainable_tensors": 504,
+        "n_trainable_params": 29933568,
+        "trainable_dtypes": [
+          "torch.float32"
+        ],
+        "lora_in_vision_tower": 0
+      },
+      "loss_first10": 0.432,
+      "loss_last10": 0.0207,
+      "before": {
+        "n_all": 200,
+        "all_pct": 94.0,
+        "seen_pct": 93.0,
+        "n_seen": 100,
+        "held_out_pct": 95.0,
+        "n_held_out": 100,
+        "by_template_pct": {
+          "compare_cs": 95.0,
+          "compare_shape": 95.0,
+          "count_cs": 85.29,
+          "exists_cs": 100.0
+        }
+      },
+      "after": {
+        "n_all": 200,
+        "all_pct": 100.0,
+        "seen_pct": 100.0,
+        "n_seen": 100,
+        "held_out_pct": 100.0,
+        "n_held_out": 100,
+        "by_template_pct": {
+          "compare_cs": 100.0,
+          "compare_shape": 100.0,
+          "count_cs": 100.0,
+          "exists_cs": 100.0
+        }
+      }
+    },
+    "diversity": {
+      "n_train": 400,
+      "train_qids_sha": "bd4bf3a90d63efe98afaa4e71c0ca4141840e8e4c32cbccc930006ca1288c5d3",
+      "steps": 100,
+      "train_seconds": 124.5,
+      "dtype": "float16",
+      "lora": {
+        "n_trainable_tensors": 504,
+        "n_trainable_params": 29933568,
+        "trainable_dtypes": [
+          "torch.float32"
+        ],
+        "lora_in_vision_tower": 0
+      },
+      "loss_first10": 0.4405,
+      "loss_last10": 0.0697,
+      "before": {
+        "n_all": 200,
+        "all_pct": 94.0,
+        "seen_pct": 93.0,
+        "n_seen": 100,
+        "held_out_pct": 95.0,
+        "n_held_out": 100,
+        "by_template_pct": {
+          "compare_cs": 95.0,
+          "compare_shape": 95.0,
+          "count_cs": 85.29,
+          "exists_cs": 100.0
+        }
+      },
+      "after": {
+        "n_all": 200,
+        "all_pct": 99.0,
+        "seen_pct": 99.0,
+        "n_seen": 100,
+        "held_out_pct": 99.0,
+        "n_held_out": 100,
+        "by_template_pct": {
+          "compare_cs": 99.0,
+          "compare_shape": 100.0,
+          "count_cs": 97.06,
+          "exists_cs": 100.0
+        }
+      }
+    }
+  }
+}

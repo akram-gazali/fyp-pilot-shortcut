@@ -16,3 +16,6 @@ The 3-point margin was not changed. With the current test set the joint score de
 
 ## Platform
 Pilot runs: Colab T4 (Stage 4, torch 2.14.1+cu130) and Kaggle T4 (Stage 5, torch 2.11.0+cu130). The full study runs on Kaggle only. Format `choice` and 224 px were fixed on the dev set and are frozen.
+
+## Disclosure: the pipeline check used the test split
+The tiny fine-tune (`reports/stage5/tiny_finetune.json`, PIPELINE CHECK ONLY) evaluated trained arms on 200 questions sampled from the test split (100 held-out compare_cs, 100 seen), after the primary metric was chosen. Its results are not used to tune anything and are not evidence for the hypothesis. The first run recorded plain accuracy only; the script now also records the paired-edit joint score per arm, which has not yet been run on a GPU.

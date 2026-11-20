@@ -3,7 +3,7 @@
     "base_resolution": 224,
     "batch_size": 16,
     "budget_hours": 20.0,
-    "cmd": "grid",
+    "cmd": "tiny-finetune",
     "compare_resolution": 336,
     "cost_bs": 4,
     "cost_res": null,
@@ -43,6 +43,6 @@
     "dirty": true
   },
   "python": "3.13.16",
-  "stage": "5-grid",
-  "written_utc": "2026-11-20T13:11:20+00:00"
+  "stage": "5-tiny-finetune",
+  "written_utc": "2026-11-20T14:23:06+00:00"
 }
