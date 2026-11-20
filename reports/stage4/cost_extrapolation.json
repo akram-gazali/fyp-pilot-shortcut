@@ -1,0 +1,82 @@
+{
+  "PILOT_NOTE": "extrapolation from measured step time; ASSUMED parts are labelled",
+  "based_on": {
+    "resolution": 448,
+    "batch": 1,
+    "sec_per_step": 3.636,
+    "peak_mem_gb": 11.69,
+    "sec_per_eval_example": 1.7746,
+    "sec_per_eval_example_source": "measured in zero-shot",
+    "eval_items_per_run": 7266,
+    "gpu": "Tesla T4"
+  },
+  "budget_hours": 20.0,
+  "scenarios": [
+    {
+      "name": "pilot tiny fine-tune (400 ex, 1 epoch, 4 arms x 1 seed)",
+      "n_train": 400,
+      "epochs": 1,
+      "runs": 4,
+      "steps": 400,
+      "train_hours": 0.404,
+      "eval_hours": 3.582,
+      "total_hours": 4.019,
+      "total_gpu_hours": 16.08,
+      "share_of_budget_pct": 80.4,
+      "fits_budget": true
+    },
+    {
+      "name": "400 ex, 3 epochs, 4 arms x 1 seed",
+      "n_train": 400,
+      "epochs": 3,
+      "runs": 4,
+      "steps": 1200,
+      "train_hours": 1.212,
+      "eval_hours": 3.582,
+      "total_hours": 4.827,
+      "total_gpu_hours": 19.31,
+      "share_of_budget_pct": 96.5,
+      "fits_budget": true
+    },
+    {
+      "name": "400 ex, 3 epochs, shortcut+random x3 seeds, difficulty+diversity x1",
+      "n_train": 400,
+      "epochs": 3,
+      "runs": 8,
+      "steps": 1200,
+      "train_hours": 1.212,
+      "eval_hours": 3.582,
+      "total_hours": 4.827,
+      "total_gpu_hours": 38.62,
+      "share_of_budget_pct": 193.1,
+      "fits_budget": false
+    },
+    {
+      "name": "400 ex, 3 epochs, 4 arms x 3 seeds",
+      "n_train": 400,
+      "epochs": 3,
+      "runs": 12,
+      "steps": 1200,
+      "train_hours": 1.212,
+      "eval_hours": 3.582,
+      "total_hours": 4.827,
+      "total_gpu_hours": 57.92,
+      "share_of_budget_pct": 289.6,
+      "fits_budget": false
+    },
+    {
+      "name": "1000 ex, 3 epochs, 4 arms x 3 seeds",
+      "n_train": 1000,
+      "epochs": 3,
+      "runs": 12,
+      "steps": 3000,
+      "train_hours": 3.03,
+      "eval_hours": 3.582,
+      "total_hours": 6.645,
+      "total_gpu_hours": 79.74,
+      "share_of_budget_pct": 398.7,
+      "fits_budget": false
+    }
+  ],
+  "caveat": "numbers are for this GPU; an A100 is several times faster than a T4, and model load (~2 min) is included per run"
+}
