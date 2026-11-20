@@ -1,46 +1,49 @@
 {
   "PILOT_NOTE": "measured on this GPU only; do not transfer to other GPUs",
-  "TRANSCRIBED": "rows copied by hand from the printed Colab log of the first grid run (the original grid.json was lost when the runtime restarted); skipped rows follow the script's skip rule (not printed in the log)",
+  "complete": true,
   "env": {
     "python": "3.13.16",
-    "torch": "2.14.1+cu130",
+    "platform": "kaggle",
+    "torch": "2.11.0+cu130",
     "cuda": true,
     "gpu": "Tesla T4",
     "gpu_memory_gb": 14.6,
+    "compute_capability": "7.5",
     "bf16_supported": true,
     "transformers": "5.22.1",
     "peft": "0.21.2"
   },
-  "dtype": "torch.float16 (assumed: T4 path)",
+  "dtype": "float16",
   "lora_r": 16,
   "gradient_checkpointing": true,
+  "prompt_method": "choice",
   "rows": [
     {
       "resolution": 224,
       "batch": 1,
       "status": "ok",
-      "peak_mem_gb": 8.62,
-      "sec_per_step_incl_preprocess": 1.163,
-      "preprocess_sec_per_batch": 0.075,
-      "tokens_per_sample": 102
+      "peak_mem_gb": 8.55,
+      "sec_per_step_incl_preprocess": 0.526,
+      "preprocess_sec_per_batch": 0.045,
+      "tokens_per_sample": 100
     },
     {
       "resolution": 224,
       "batch": 2,
       "status": "ok",
-      "peak_mem_gb": 9.84,
-      "sec_per_step_incl_preprocess": 2.015,
+      "peak_mem_gb": 9.72,
+      "sec_per_step_incl_preprocess": 0.538,
       "preprocess_sec_per_batch": 0.017,
-      "tokens_per_sample": 102
+      "tokens_per_sample": 100
     },
     {
       "resolution": 224,
       "batch": 4,
       "status": "ok",
-      "peak_mem_gb": 12.29,
-      "sec_per_step_incl_preprocess": 3.793,
-      "preprocess_sec_per_batch": 0.026,
-      "tokens_per_sample": 101
+      "peak_mem_gb": 11.89,
+      "sec_per_step_incl_preprocess": 0.852,
+      "preprocess_sec_per_batch": 0.022,
+      "tokens_per_sample": 100
     },
     {
       "resolution": 224,
@@ -51,19 +54,19 @@
       "resolution": 336,
       "batch": 1,
       "status": "ok",
-      "peak_mem_gb": 9.89,
-      "sec_per_step_incl_preprocess": 2.005,
-      "preprocess_sec_per_batch": 0.029,
-      "tokens_per_sample": 182
+      "peak_mem_gb": 9.72,
+      "sec_per_step_incl_preprocess": 0.575,
+      "preprocess_sec_per_batch": 0.013,
+      "tokens_per_sample": 180
     },
     {
       "resolution": 336,
       "batch": 2,
       "status": "ok",
-      "peak_mem_gb": 12.32,
-      "sec_per_step_incl_preprocess": 4.037,
-      "preprocess_sec_per_batch": 0.04,
-      "tokens_per_sample": 182
+      "peak_mem_gb": 12.0,
+      "sec_per_step_incl_preprocess": 0.878,
+      "preprocess_sec_per_batch": 0.021,
+      "tokens_per_sample": 180
     },
     {
       "resolution": 336,
@@ -79,10 +82,10 @@
       "resolution": 448,
       "batch": 1,
       "status": "ok",
-      "peak_mem_gb": 11.69,
-      "sec_per_step_incl_preprocess": 3.636,
-      "preprocess_sec_per_batch": 0.03,
-      "tokens_per_sample": 294
+      "peak_mem_gb": 11.36,
+      "sec_per_step_incl_preprocess": 0.793,
+      "preprocess_sec_per_batch": 0.024,
+      "tokens_per_sample": 292
     },
     {
       "resolution": 448,

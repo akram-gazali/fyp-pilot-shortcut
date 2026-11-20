@@ -1,0 +1,48 @@
+{
+  "config": {
+    "base_resolution": 224,
+    "batch_size": 16,
+    "budget_hours": 20.0,
+    "cmd": "grid",
+    "compare_resolution": 336,
+    "cost_bs": 4,
+    "cost_res": null,
+    "dry_run": false,
+    "dtype": "auto",
+    "exists_mode": "stratified_quota",
+    "grid_bs": [
+      1,
+      2,
+      4,
+      8
+    ],
+    "grid_res": [
+      224,
+      336,
+      448
+    ],
+    "grid_steps": 5,
+    "held_out_only": false,
+    "load_4bit": false,
+    "lora_r": 16,
+    "lr": 0.0001,
+    "max_questions": null,
+    "method": null,
+    "out": "/kaggle/working/stage5_results",
+    "resolution": null,
+    "sec_per_eval": 0.25,
+    "skip_edits": false,
+    "skip_shuffle": false,
+    "skip_version_check": false,
+    "tiny_bs": 4,
+    "tiny_eval_n": 100,
+    "tiny_n": 400
+  },
+  "git": {
+    "commit": "a1a2e8ea37f2bba84491b28db605819fd21e58a8",
+    "dirty": true
+  },
+  "python": "3.13.16",
+  "stage": "5-grid",
+  "written_utc": "2026-11-20T13:11:20+00:00"
+}

@@ -1,0 +1,155 @@
+{
+  "PILOT_NOTE": "dev-set study on the TRAIN split; the test set is not used. Pilot numbers, one run each.",
+  "env": {
+    "python": "3.13.16",
+    "platform": "kaggle",
+    "torch": "2.11.0+cu130",
+    "cuda": true,
+    "gpu": "Tesla T4",
+    "gpu_memory_gb": 14.6,
+    "compute_capability": "7.5",
+    "bf16_supported": true,
+    "transformers": "5.22.1",
+    "peft": "0.21.2"
+  },
+  "dtype": "float16",
+  "dev_set": {
+    "split": "train",
+    "n": 766
+  },
+  "runs": {
+    "suffix@224": {
+      "method": "suffix",
+      "resolution": 224,
+      "dtype": "float16",
+      "n": 766,
+      "acc_by_template_pct": {
+        "compare_shape": 93.7,
+        "count_cs": 88.97,
+        "exists_cs": 97.99
+      },
+      "macro_acc_pct": 93.55,
+      "overall_acc_pct": 93.47,
+      "wrong_format_pct": 0.0,
+      "sec_per_item": 0.0799,
+      "batch_size": 16,
+      "raw_examples": {
+        "s00001_q0": "Yes.",
+        "s00001_q1": "Yes.",
+        "s00011_q0": "0",
+        "s00020_q1": "Yes.",
+        "s00037_q0": "Yes.",
+        "s00037_q1": "No",
+        "s00058_q0": "1",
+        "s00058_q1": "No",
+        "s00067_q0": "0",
+        "s00069_q0": "No."
+      }
+    },
+    "choice@224": {
+      "method": "choice",
+      "resolution": 224,
+      "dtype": "float16",
+      "n": 766,
+      "acc_by_template_pct": {
+        "compare_shape": 93.7,
+        "count_cs": 88.97,
+        "exists_cs": 97.99
+      },
+      "macro_acc_pct": 93.55,
+      "overall_acc_pct": 93.47,
+      "wrong_format_pct": 0.0,
+      "sec_per_item": 0.0718,
+      "batch_size": 16,
+      "raw_examples": {
+        "s00001_q0": "yes",
+        "s00001_q1": "yes",
+        "s00011_q0": "0",
+        "s00020_q1": "yes",
+        "s00037_q0": "yes",
+        "s00037_q1": "no",
+        "s00058_q0": "1",
+        "s00058_q1": "no",
+        "s00067_q0": "0",
+        "s00069_q0": "no"
+      }
+    },
+    "legacy@224": {
+      "method": "legacy",
+      "resolution": 224,
+      "dtype": "float16",
+      "n": 766,
+      "acc_by_template_pct": {
+        "compare_shape": 81.89,
+        "count_cs": 89.35,
+        "exists_cs": 54.62
+      },
+      "macro_acc_pct": 75.29,
+      "overall_acc_pct": 75.59,
+      "wrong_format_pct": 40.47,
+      "sec_per_item": 0.085,
+      "batch_size": 16,
+      "raw_examples": {
+        "s00001_q0": "1",
+        "s00001_q1": "Yes",
+        "s00011_q0": "0",
+        "s00020_q1": "1",
+        "s00037_q0": "Yes, 6",
+        "s00037_q1": "No",
+        "s00058_q0": "1",
+        "s00058_q1": "No",
+        "s00067_q0": "0",
+        "s00069_q0": "0"
+      }
+    },
+    "choice@336": {
+      "method": "choice",
+      "resolution": 336,
+      "dtype": "float16",
+      "n": 766,
+      "acc_by_template_pct": {
+        "compare_shape": 96.06,
+        "count_cs": 90.87,
+        "exists_cs": 99.2
+      },
+      "macro_acc_pct": 95.38,
+      "overall_acc_pct": 95.3,
+      "wrong_format_pct": 0.0,
+      "sec_per_item": 0.1459,
+      "batch_size": 16,
+      "raw_examples": {
+        "s00001_q0": "yes",
+        "s00001_q1": "yes",
+        "s00011_q0": "0",
+        "s00020_q1": "yes",
+        "s00037_q0": "yes",
+        "s00037_q1": "no",
+        "s00058_q0": "1",
+        "s00058_q1": "no",
+        "s00067_q0": "0",
+        "s00069_q0": "no"
+      }
+    }
+  },
+  "selection": {
+    "method": {
+      "chosen": "choice",
+      "best_macro_acc": 93.55,
+      "tied_methods": [
+        "choice",
+        "suffix"
+      ],
+      "tie_pts": 1.0
+    },
+    "resolution": {
+      "chosen": 224,
+      "base": 224,
+      "margin_pts": 2.0,
+      "acc_by_res": {
+        "224": 93.55,
+        "336": 95.38
+      }
+    },
+    "rule": "method: highest dev macro accuracy, within 1 point is a tie -> faster; resolution: native unless the larger one is better by MORE than 2 macro points"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "method": "choice",
+  "resolution": 224,
+  "dtype": "float16",
+  "decided_on": "dev set (train split)",
+  "details": {
+    "method": {
+      "chosen": "choice",
+      "best_macro_acc": 93.55,
+      "tied_methods": [
+        "choice",
+        "suffix"
+      ],
+      "tie_pts": 1.0
+    },
+    "resolution": {
+      "chosen": 224,
+      "base": 224,
+      "margin_pts": 2.0,
+      "acc_by_res": {
+        "224": 93.55,
+        "336": 95.38
+      }
+    },
+    "rule": "method: highest dev macro accuracy, within 1 point is a tie -> faster; resolution: native unless the larger one is better by MORE than 2 macro points"
+  }
+}
