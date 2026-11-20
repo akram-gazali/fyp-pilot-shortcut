@@ -39,10 +39,10 @@
     "tiny_n": 400
   },
   "git": {
-    "commit": "a1a2e8ea37f2bba84491b28db605819fd21e58a8",
-    "dirty": true
+    "commit": "7e1383bc9921b6d3c346e565a8005128d62ead35",
+    "dirty": false
   },
   "python": "3.13.16",
   "stage": "5-tiny-finetune",
-  "written_utc": "2026-11-20T14:23:06+00:00"
+  "written_utc": "2026-11-20T14:56:12+00:00"
 }

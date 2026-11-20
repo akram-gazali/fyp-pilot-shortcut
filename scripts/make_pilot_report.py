@@ -161,6 +161,13 @@ def main():
             rows.append([a, v["steps"], v["train_seconds"], round(v["train_seconds"] / v["steps"], 3), f"{v['loss_first10']} -> {v['loss_last10']}",
                          f"{v['before']['held_out_pct']} -> {v['after']['held_out_pct']}", f"{v['before']['seen_pct']} -> {v['after']['seen_pct']}", jt])
         L += table(["arm", "steps", "train s", "s/step", "loss first10 -> last10", "plain held-out % (n=100)", "plain seen % (n=100)", "joint held-out % (primary)"], rows)
+        jbs = {json.dumps(v["joint_before"]["held_out"], sort_keys=True) for v in ti["arms"].values() if v.get("joint_before")}
+        if jbs:
+            n1 = next(iter(ti["arms"].values()))["joint_before"]["held_out"]["n_paired"]
+            ns = next(iter(ti["arms"].values()))["joint_before"]["seen"]["n_paired"]
+            L += [f"- `joint_before` is {'identical' if len(jbs) == 1 else 'NOT identical'} across arms (same frozen model, same items). "
+                  f"The held-out joint score rests on only {n1} paired items, so one pair = {round(100 / n1, 2)} points (seen: {ns} pairs). "
+                  "The test-split subset here is not the full paired set (n=355), so these joint numbers differ from section 6b.", ""]
         L += ["LoRA check (all arms): trainable dtypes `%s`, adapters inside the vision tower: %s." % (
                 sorted({d for v in ti["arms"].values() for d in v["lora"]["trainable_dtypes"]}), sorted({v["lora"]["lora_in_vision_tower"] for v in ti["arms"].values()})),
               "Differences between arms are single-seed, n=100 per group and are not interpreted. Plain accuracy was near ceiling before training (see 6b).", ""]
@@ -180,7 +187,7 @@ def main():
                                     if co else "no cost file") + " Largest scenario: %s GPU-hours. See section 7." % (max(s["total_gpu_hours"] for s in co["scenarios"]) if co else "n/a")),
           "4b. **Headroom.** The frozen model is near ceiling on plain held-out accuracy (section 6b); the primary metric must be fixed in the protocol.",
           ("5. **Training code.** " + ("`tiny-finetune` ran end to end on a Kaggle T4 (section 7b; pipeline check only, one seed, tiny budget). Its eval used test questions (disclosed in `PROTOCOL.md`)."
-                                       if ti else "`tiny-finetune` is untested on a GPU.") + " Joint score per arm is computed by the script from now on; the first tiny run recorded plain accuracy only."),
+                                       if ti else "`tiny-finetune` is untested on a GPU.") + " The tiny run records the joint score per arm (rerun on Kaggle at commit 7e1383b)."),
           ("6. **Answer format.** Fixed in Stage 5 (per-template instruction or choice scoring, chosen on the dev set); see sections 5b and 6." if stage5_zs else
           "6. **Answer-format failures.** Stage 4 outputs like `0` for yes/no questions were scored wrong; the Stage 5 fix is written but its GPU run is pending."),
           "7. **Synthetic-to-real gap and one operation combination.** One held-out combination (compare_cs) in simple 2D scenes; no claim beyond this pilot (not measured here).",

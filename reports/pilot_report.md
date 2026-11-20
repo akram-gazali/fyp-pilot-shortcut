@@ -125,7 +125,7 @@ dtype `float16`, GPU `Tesla T4`, complete=True.
 | 448 | 4 | skipped (smaller batch already OOM) |  |  |
 | 448 | 8 | skipped (smaller batch already OOM) |  |  |
 
-Zero-shot eval speed 0.0702 s/example (measured in zero-shot). Budget 20.0 GPU-hours. Extrapolation uses 224 px, batch 4, 1.24 s/step (measured in tiny-finetune (4 arms, 400 steps, 224 px, batch 4); the grid timing was 0.852 s/step).
+Zero-shot eval speed 0.0702 s/example (measured in zero-shot). Budget 20.0 GPU-hours. Extrapolation uses 224 px, batch 4, 1.2422 s/step (measured in tiny-finetune (4 arms, 400 steps, 224 px, batch 4); the grid timing was 0.852 s/step).
 
 | scenario | GPU-hours | % of budget | fits |
 |---|---|---|---|
@@ -133,30 +133,32 @@ Zero-shot eval speed 0.0702 s/example (measured in zero-shot). Budget 20.0 GPU-h
 | 400 ex, 3 epochs, 4 arms x 1 seed | 1.11 | 5.6 | True |
 | 400 ex, 3 epochs, shortcut+random x3 seeds, difficulty+diversity x1 | 2.23 | 11.1 | True |
 | 400 ex, 3 epochs, 4 arms x 3 seeds | 3.34 | 16.7 | True |
-| 1000 ex, 3 epochs, 4 arms x 3 seeds | 5.2 | 26.0 | True |
+| 1000 ex, 3 epochs, 4 arms x 3 seeds | 5.21 | 26.0 | True |
 | 400 ex, 3 epochs, 4 arms x 3 seeds, test set 3x | 6.74 | 33.7 | True |
-| 1000 ex, 3 epochs, 4 arms x 3 seeds, test set 3x | 8.6 | 43.0 | True |
+| 1000 ex, 3 epochs, 4 arms x 3 seeds, test set 3x | 8.61 | 43.0 | True |
 | 400 ex, 3 epochs, 4 arms x 3 seeds, test set 5x | 10.14 | 50.7 | True |
-| 1000 ex, 3 epochs, 4 arms x 3 seeds, test set 5x | 12.0 | 60.0 | True |
+| 1000 ex, 3 epochs, 4 arms x 3 seeds, test set 5x | 12.01 | 60.0 | True |
 
 T4 numbers do not transfer to other GPUs. Test sizes 3x and 5x multiply the evaluation items per run (7,266 now).
 
 Platforms (torch labelled per platform; the full study runs on Kaggle only): Stage 4 zero-shot: colab torch 2.14.1+cu130, Tesla T4; Stage 5: kaggle torch 2.11.0+cu130, Tesla T4
 
-Previous (Stage 4, 448 px, old grid) vs now, GPU-hours: pilot tiny fine-tune (400 ex, 1 epoch, 4: 16.08 -> 0.84; 400 ex, 3 epochs, 4 arms x 1 seed: 19.31 -> 1.11; 400 ex, 3 epochs, shortcut+random x3 see: 38.62 -> 2.23; 400 ex, 3 epochs, 4 arms x 3 seeds: 57.92 -> 3.34; 1000 ex, 3 epochs, 4 arms x 3 seeds: 79.74 -> 5.2
+Previous (Stage 4, 448 px, old grid) vs now, GPU-hours: pilot tiny fine-tune (400 ex, 1 epoch, 4: 16.08 -> 0.84; 400 ex, 3 epochs, 4 arms x 1 seed: 19.31 -> 1.11; 400 ex, 3 epochs, shortcut+random x3 see: 38.62 -> 2.23; 400 ex, 3 epochs, 4 arms x 3 seeds: 57.92 -> 3.34; 1000 ex, 3 epochs, 4 arms x 3 seeds: 79.74 -> 5.21
 
 ## 7b. Tiny fine-tune (PIPELINE CHECK ONLY)
 **PIPELINE CHECK ONLY: one seed, tiny budget. This shows the code path runs end to end. It is NOT evidence for or against the hypothesis; differences between arms are within noise.**
 
-- Eval split: the TEST split (200 questions: 100 held-out compare_cs, 100 seen, sampled from data/splits/test.jsonl, seed 0). Trained arms were therefore evaluated on test questions; see `PROTOCOL.md` for the disclosure.
+- Eval split: test (200 questions sampled from data/splits/test.jsonl, seed 0, plus their paired edits). Trained arms were therefore evaluated on test questions; see `PROTOCOL.md` for the disclosure.
 - Method `choice`, 224 px, platform `kaggle`, torch 2.11.0+cu130, selection manifest `selection_stratified_quota_seed0.json`. Each arm: 400 training questions, 1 epoch, batch 4, seed 0.
 
 | arm | steps | train s | s/step | loss first10 -> last10 | plain held-out % (n=100) | plain seen % (n=100) | joint held-out % (primary) |
 |---|---|---|---|---|---|---|---|
-| shortcut_aware | 100 | 120.9 | 1.209 | 0.3936 -> 0.0812 | 95.0 -> 99.0 | 93.0 -> 93.0 | not recorded in this run |
-| matched_random | 100 | 125.4 | 1.254 | 0.463 -> 0.0099 | 95.0 -> 99.0 | 93.0 -> 99.0 | not recorded in this run |
-| difficulty | 100 | 125.2 | 1.252 | 0.432 -> 0.0207 | 95.0 -> 100.0 | 93.0 -> 100.0 | not recorded in this run |
-| diversity | 100 | 124.5 | 1.245 | 0.4405 -> 0.0697 | 95.0 -> 99.0 | 93.0 -> 99.0 | not recorded in this run |
+| shortcut_aware | 100 | 122.4 | 1.224 | 0.3935 -> 0.0809 | 95.0 -> 99.0 | 93.0 -> 93.0 | 66.67 -> 80.95 (n=63) |
+| matched_random | 100 | 125.2 | 1.252 | 0.4628 -> 0.0095 | 95.0 -> 99.0 | 93.0 -> 99.0 | 66.67 -> 84.13 (n=63) |
+| difficulty | 100 | 124.8 | 1.248 | 0.432 -> 0.0209 | 95.0 -> 100.0 | 93.0 -> 100.0 | 66.67 -> 82.54 (n=63) |
+| diversity | 100 | 124.5 | 1.245 | 0.4405 -> 0.0684 | 95.0 -> 99.0 | 93.0 -> 99.0 | 66.67 -> 84.13 (n=63) |
+
+- `joint_before` is identical across arms (same frozen model, same items). The held-out joint score rests on only 63 paired items, so one pair = 1.59 points (seen: 82 pairs). The test-split subset here is not the full paired set (n=355), so these joint numbers differ from section 6b.
 
 LoRA check (all arms): trainable dtypes `['torch.float32']`, adapters inside the vision tower: [0].
 Differences between arms are single-seed, n=100 per group and are not interpreted. Plain accuracy was near ceiling before training (see 6b).
@@ -174,9 +176,9 @@ Items below come from the measurements above unless marked otherwise.
 1. **Exists label confound.** d=1 implies "no" for exists (structural). Quotas equalise labels across arms, but any exists effect is entangled with the selector. A fixed-shared-base mode exists behind a config switch.
 2. **Weak shortcut contrast on count.** Matched random already has a high d=1 share on count (see section 5: shortcut arm 100% vs matched random about 70%), so the contrast is modest. Strict or graded d are options, not implemented; graded d also raises object count (a difficulty confound).
 3. **Underpowered test set.** 500 held-out scenes detect only about 6 to 8 points; the proposal is several thousand scenes. If seed sd exceeds the ceiling, no test size works (sd is ASSUMED until measured).
-4. **GPU budget.** Scenarios over the 20.0 GPU-hour budget: none. Largest scenario: 12.0 GPU-hours. See section 7.
+4. **GPU budget.** Scenarios over the 20.0 GPU-hour budget: none. Largest scenario: 12.01 GPU-hours. See section 7.
 4b. **Headroom.** The frozen model is near ceiling on plain held-out accuracy (section 6b); the primary metric must be fixed in the protocol.
-5. **Training code.** `tiny-finetune` ran end to end on a Kaggle T4 (section 7b; pipeline check only, one seed, tiny budget). Its eval used test questions (disclosed in `PROTOCOL.md`). Joint score per arm is computed by the script from now on; the first tiny run recorded plain accuracy only.
+5. **Training code.** `tiny-finetune` ran end to end on a Kaggle T4 (section 7b; pipeline check only, one seed, tiny budget). Its eval used test questions (disclosed in `PROTOCOL.md`). The tiny run records the joint score per arm (rerun on Kaggle at commit 7e1383b).
 6. **Answer format.** Fixed in Stage 5 (per-template instruction or choice scoring, chosen on the dev set); see sections 5b and 6.
 7. **Synthetic-to-real gap and one operation combination.** One held-out combination (compare_cs) in simple 2D scenes; no claim beyond this pilot (not measured here).
 8. **Library drift.** Colab ships newer transformers/peft than local; `torchao` had to be uninstalled. Kaggle (torch 2.11.0+cu130) and the earlier Colab run (torch 2.14.1+cu130) differ in torch; see `requirements-gpu.txt` and `reports/stage5/env_freeze.json`.
