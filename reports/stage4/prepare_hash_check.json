@@ -1,0 +1,19 @@
+{
+  "match": {
+    "questions": true,
+    "train": true,
+    "pool": true,
+    "test": true,
+    "test_edits": true
+  },
+  "env": {
+    "python": "3.13.16",
+    "torch": "2.14.1+cu130",
+    "cuda": true,
+    "gpu": "Tesla T4",
+    "gpu_memory_gb": 14.6,
+    "bf16_supported": true,
+    "transformers": "5.22.1",
+    "peft": "0.21.2"
+  }
+}

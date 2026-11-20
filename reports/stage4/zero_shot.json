@@ -1,0 +1,91 @@
+{
+  "PILOT_NOTE": "frozen-model reference (headroom). Pilot number, one run, greedy decoding.",
+  "model": "Qwen/Qwen2.5-VL-3B-Instruct",
+  "resolution": 448,
+  "dry_run": false,
+  "env": {
+    "python": "3.13.16",
+    "torch": "2.14.1+cu130",
+    "cuda": true,
+    "gpu": "Tesla T4",
+    "gpu_memory_gb": 14.6,
+    "bf16_supported": true,
+    "transformers": "5.22.1",
+    "peft": "0.21.2"
+  },
+  "plain_accuracy_all_questions": {
+    "n_all": 2000,
+    "all_pct": 64.9,
+    "seen_pct": 70.67,
+    "n_seen": 1500,
+    "held_out_pct": 47.6,
+    "n_held_out": 500,
+    "by_template_pct": {
+      "compare_cs": 47.6,
+      "compare_shape": 71.2,
+      "count_cs": 93.0,
+      "exists_cs": 47.8
+    }
+  },
+  "joint_score_paired_subset": {
+    "held_out": {
+      "n_paired": 355,
+      "joint_pct": 2.82,
+      "original_pct": 41.69,
+      "relevant_edit_pct": 13.24,
+      "irrelevant_edit_pct": 38.87
+    },
+    "seen": {
+      "n_paired": 1278,
+      "joint_pct": 43.74,
+      "original_pct": 67.06,
+      "relevant_edit_pct": 57.82,
+      "irrelevant_edit_pct": 66.2
+    },
+    "all_paired": {
+      "n_paired": 1633,
+      "joint_pct": 34.84,
+      "original_pct": 61.54,
+      "relevant_edit_pct": 48.13,
+      "irrelevant_edit_pct": 60.26
+    }
+  },
+  "shuffled_image_baseline": {
+    "n_all": 2000,
+    "all_pct": 24.85,
+    "seen_pct": 25.73,
+    "n_seen": 1500,
+    "held_out_pct": 22.2,
+    "n_held_out": 500,
+    "by_template_pct": {
+      "compare_cs": 22.2,
+      "compare_shape": 39.6,
+      "count_cs": 28.2,
+      "exists_cs": 9.4
+    }
+  },
+  "majority_baselines_from_stage3_for_comparison": "see reports/stage3_leakage.json",
+  "timing": {
+    "sec_per_example": 1.7746,
+    "n_items": 7266,
+    "batch_size": 16
+  },
+  "raw_output_examples": {
+    "s00010_t_count_cs_0": "0",
+    "s00010_t_exists_cs_0": "0",
+    "s00010_t_compare_shape_0": "No",
+    "s00010_t_compare_cs_0": "no",
+    "s00021_t_count_cs_0": "2",
+    "s00021_t_exists_cs_0": "Yes, 1",
+    "s00021_t_compare_shape_0": "No",
+    "s00021_t_compare_cs_0": "0",
+    "s00027_t_count_cs_0": "0",
+    "s00027_t_exists_cs_0": "0",
+    "s00027_t_compare_shape_0": "No",
+    "s00027_t_compare_cs_0": "No",
+    "s00035_t_count_cs_0": "1",
+    "s00035_t_exists_cs_0": "0",
+    "s00035_t_compare_shape_0": "Yes, 5"
+  },
+  "unparsed_outputs": 0
+}
