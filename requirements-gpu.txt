@@ -1,0 +1,7 @@
+# Exact versions of the GPU environment (non-torch packages are ENFORCED by the version check; torch is recorded and warned on only).
+# Only the two versions below were measured in the Colab run (reports/stage4/zero_shot.json "env").
+# The rest are NOT pinned yet: run `python scripts/freeze_env.py` on the GPU machine and add its lines here.
+transformers==5.22.1
+peft==0.21.2
+# torch==2.14.1+cu130   (Colab run; informational, never forced)
+# torchao must be uninstalled on Colab (0.10 is rejected by peft); scripts/install_pinned.py does it.

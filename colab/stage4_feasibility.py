@@ -1,23 +1,24 @@
 #!/usr/bin/env python
-"""Stage 4: model feasibility check for SIFT-VQA (Qwen2.5-VL-3B-Instruct + LoRA).
+"""Stages 4/5: model feasibility and evaluation-format study for SIFT-VQA (Qwen2.5-VL-3B-Instruct + LoRA).
 
-WRITTEN BUT NOT YET RUN ON A GPU. Expect small fixes on the first Colab run (library versions).
-This is a feasibility check, NOT evidence for the hypothesis.
+GPU parts have NOT been run since the Stage 5 rewrite. This is a feasibility check, NOT evidence for the hypothesis.
 
 Subcommands (run from the repo root, in this order):
+  check-env      print library versions, fail if a pinned non-torch package differs from requirements-gpu.txt
   prepare        regenerate data/ from the committed configs (CPU) and compare hashes to the manifests
-  zero-shot      frozen reference: plain accuracy on ALL test questions (seen / held-out, by template),
-                 joint score on the PAIRED subset (separately), and a shuffled-image baseline
-  grid           peak GPU memory and seconds per LoRA training step over resolution x batch size
+  dev-format     choose the answer-format method (suffix vs choice scoring) and image resolution on the DEV set
+                 (the train split). The test set is never used to choose either.
+  zero-shot      frozen reference on the test set with the chosen method: plain accuracy on ALL questions,
+                 joint score on the PAIRED subset (separately), shuffled-image baseline
+  grid           peak GPU memory and seconds per LoRA training step; writes grid.json row by row
   cost           extrapolate GPU hours per arm / per study scenario from the measured numbers
   tiny-finetune  OPTIONAL: one tiny fine-tune per arm (seed 0) to confirm the code path runs end to end
-  all            prepare + zero-shot + grid + cost
 
-  --dry-run      no model, no GPU: checks data loading and the scoring code with a stand-in predictor
-                 that returns the true answers (so every endpoint should read 100%).
+  --dry-run      no model, no GPU: checks data loading and the scoring code with a stand-in predictor.
 
-Needs: GPU runtime; HF token as Colab secret `HF_TOKEN` (or env var HF_TOKEN); see colab/COLAB_STEPS.md.
-The token is read from the environment only and is never written to any output file.
+Platform: Kaggle (preferred) or Colab. On Kaggle one GPU is used (CUDA_VISIBLE_DEVICES=0), the Hugging Face cache goes
+to /kaggle/temp and results to /kaggle/working. No Colab-only calls are needed. The HF token is optional (public model);
+if present it is read from env HF_TOKEN or the Kaggle/Colab secret store and never printed or saved.
 """
 import argparse
 import json
@@ -31,31 +32,46 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
+ON_KAGGLE = Path("/kaggle").exists()
+if ON_KAGGLE:                                   # must happen before torch is imported
+    os.environ.setdefault("CUDA_VISIBLE_DEVICES", "0")
+    os.environ.setdefault("HF_HOME", "/kaggle/temp/hf")
+
+from siftvqa import formats  # noqa: E402
 from siftvqa.config import sha256_file  # noqa: E402
 from siftvqa.cost import extrapolate  # noqa: E402
 from siftvqa.runmeta import write_run_meta  # noqa: E402
-from siftvqa.vlm_eval import joint_report, normalize_answer, plain_accuracy_report  # noqa: E402
+from siftvqa.train_utils import build_train_batch, lora_report, seed_all  # noqa: E402
+from siftvqa.vlm_eval import accuracy, joint_report, normalize_answer, plain_accuracy_report  # noqa: E402
 
 MODEL = "Qwen/Qwen2.5-VL-3B-Instruct"
-SUFFIX = " Answer with a single word or number."
 HELD_OUT = "compare_cs"
 LORA_TARGETS = r"^(?!.*visual).*\.(q_proj|k_proj|v_proj|o_proj|gate_proj|up_proj|down_proj)$"  # language model only
 SPL = ROOT / "data" / "splits"
+DEFAULT_OUT = "/kaggle/working/stage5_results" if ON_KAGGLE else str(ROOT / "reports" / "stage5")
+PINS = ROOT / "requirements-gpu.txt"
+
+
+def jdump(path, obj):
+    formats.write_json_atomic(path, obj)
 
 
 # ----------------------------------------------------------------------------- environment
 def login_hf():
-    """Use the token only for hub authentication; never print or save it."""
+    """Optional (the model is public). Token only for hub authentication; never printed or saved."""
     token = os.environ.get("HF_TOKEN")
     if not token:
-        try:
-            from google.colab import userdata
-            token = userdata.get("HF_TOKEN")
-        except Exception:
-            token = None
+        for mod, getter in (("kaggle_secrets", lambda m: m.UserSecretsClient().get_secret("HF_TOKEN")),
+                            ("google.colab.userdata", lambda m: m.get("HF_TOKEN"))):
+            try:
+                import importlib
+                token = getter(importlib.import_module(mod))
+                if token:
+                    break
+            except Exception:
+                token = None
     if not token:
-        print("WARNING: no HF_TOKEN found (Colab secret or env var). The model is public, so this may still work, "
-              "but downloads can be rate-limited.")
+        print("note: no HF_TOKEN found; the model is public, so this is fine (downloads may be rate-limited).")
         return False
     from huggingface_hub import login
     login(token=token, add_to_git_credential=False)
@@ -63,13 +79,14 @@ def login_hf():
 
 
 def env_info():
-    info = {"python": sys.version.split()[0]}
+    info = {"python": sys.version.split()[0], "platform": "kaggle" if ON_KAGGLE else "other"}
     try:
         import torch
         info.update(torch=torch.__version__, cuda=torch.cuda.is_available())
         if torch.cuda.is_available():
             p = torch.cuda.get_device_properties(0)
-            info.update(gpu=p.name, gpu_memory_gb=round(p.total_memory / 2 ** 30, 1), bf16_supported=torch.cuda.is_bf16_supported())
+            info.update(gpu=p.name, gpu_memory_gb=round(p.total_memory / 2 ** 30, 1), compute_capability=f"{p.major}.{p.minor}",
+                        bf16_supported=torch.cuda.is_bf16_supported())
         import transformers
         info["transformers"] = transformers.__version__
         import peft
@@ -80,10 +97,21 @@ def env_info():
 
 
 def pick_dtype(args):
+    """T4 (compute capability 7.5) -> fp16 even though torch reports bf16 'supported' (emulated, slow)."""
     import torch
-    if args.dtype == "auto":
-        return torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16   # T4: fp16
-    return {"fp16": torch.float16, "bf16": torch.bfloat16}[args.dtype]
+    major = torch.cuda.get_device_properties(0).major if torch.cuda.is_available() else 8
+    name = formats.choose_dtype(args.dtype, major)
+    return {"fp16": torch.float16, "bf16": torch.bfloat16}[name]
+
+
+def dtype_name(dtype):
+    return str(dtype).replace("torch.", "")
+
+
+def preflight(args):
+    if args.dry_run or args.skip_version_check:
+        return {}
+    return formats.check_pins(PINS)
 
 
 # ----------------------------------------------------------------------------- data
@@ -124,9 +152,7 @@ def cmd_prepare(args):
     if not all(rep.values()):
         print("WARNING: regenerated data differs from the committed manifests (different Python/library version?). "
               "Results are then not comparable with the local Stage 1-3 numbers.")
-    out = Path(args.out)
-    out.mkdir(parents=True, exist_ok=True)
-    (out / "prepare_hash_check.json").write_text(json.dumps({"match": rep, "env": env_info()}, indent=2))
+    jdump(Path(args.out) / "prepare_hash_check.json", {"match": rep, "env": env_info()})
 
 
 # ----------------------------------------------------------------------------- model helpers
@@ -154,21 +180,23 @@ def add_lora(model, args, dtype):
         model = prepare_model_for_kbit_training(model)
     model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
     model.enable_input_require_grads()
-    cfg = LoraConfig(r=args.lora_r, lora_alpha=2 * args.lora_r, lora_dropout=0.05, target_modules=LORA_TARGETS, task_type="CAUSAL_LM")
-    model = get_peft_model(model, cfg)       # adapters are kept in fp32 by peft even if the base is fp16
-    trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(f"LoRA r={args.lora_r}: trainable params {trainable:,}")
+    cfg = LoraConfig(r=args.lora_r, lora_alpha=2 * args.lora_r, lora_dropout=0.05, target_modules=LORA_TARGETS,
+                     task_type="CAUSAL_LM", autocast_adapter_dtype=True)   # adapters fp32 even on an fp16 base
+    model = get_peft_model(model, cfg)
+    rep = lora_report(model)                  # raises if adapters are not fp32 or touch the vision tower
+    print(f"LoRA r={args.lora_r}: {rep}")
     return model
 
 
-def chat_text(proc, question, add_generation_prompt=True):
-    msgs = [{"role": "user", "content": [{"type": "image"}, {"type": "text", "text": question + SUFFIX}]}]
+def chat_text(proc, question, template, method, add_generation_prompt=True):
+    """The ONE prompt builder, used by evaluation and training alike."""
+    msgs = [{"role": "user", "content": [{"type": "image"}, {"type": "text", "text": formats.prompt_text(question, template, method)}]}]
     return proc.apply_chat_template(msgs, tokenize=False, add_generation_prompt=add_generation_prompt)
 
 
 # ----------------------------------------------------------------------------- inference
-def run_inference(model, proc, items, res, bs, max_new_tokens=6):
-    """items: list of dicts {key, path, question}. Returns {key: raw_text}, seconds per example."""
+def run_generate(model, proc, items, res, bs, method):
+    """Greedy free generation. Returns {key: raw_text}, seconds per item."""
     import torch
     proc.tokenizer.padding_side = "left"
     model.eval()
@@ -176,42 +204,182 @@ def run_inference(model, proc, items, res, bs, max_new_tokens=6):
     for i in range(0, len(items), bs):
         chunk = items[i:i + bs]
         images = [load_image(c["path"], res) for c in chunk]
-        texts = [chat_text(proc, c["question"]) for c in chunk]
+        texts = [chat_text(proc, c["question"], c["template"], method) for c in chunk]
         enc = proc(text=texts, images=images, return_tensors="pt", padding=True).to(model.device)
         with torch.no_grad():
-            gen = model.generate(**enc, max_new_tokens=max_new_tokens, do_sample=False, use_cache=True)
+            gen = model.generate(**enc, max_new_tokens=6 if method == "legacy" else 4, do_sample=False, use_cache=True)
         dec = proc.batch_decode(gen[:, enc["input_ids"].shape[1]:], skip_special_tokens=True)
         for c, d in zip(chunk, dec):
             out[c["key"]] = d
         if (i // bs) % 20 == 0:
-            print(f"  inference {i + len(chunk)}/{len(items)}", flush=True)
+            print(f"  generate {i + len(chunk)}/{len(items)}", flush=True)
     torch.cuda.synchronize()
     return out, (time.time() - t0) / max(1, len(items))
 
 
-def dry_inference(items):
+def candidate_token_ids(proc, templates):
+    """{template: {answer: [token ids of its surface forms]}}; every surface form must be ONE token, else stop."""
+    tok, table = proc.tokenizer, {}
+    for t in set(templates):
+        table[t] = {}
+        for ans in formats.candidates(t):
+            ids = []
+            for s in formats.surface_forms(ans):
+                enc = tok.encode(s, add_special_tokens=False)
+                if len(enc) != 1:
+                    raise SystemExit(f"STOP: candidate {s!r} is {len(enc)} tokens; choice scoring needs single-token answers.")
+                ids.append(enc[0])
+            table[t][ans] = ids
+    return table
+
+
+def run_choice(model, proc, items, res, bs):
+    """Choice scoring: one forward pass per batch; the answer is the candidate with the highest log-probability at
+    the first answer position. No generation. Returns {key: answer}, seconds per item."""
+    import torch
+    proc.tokenizer.padding_side = "left"
+    model.eval()
+    table = candidate_token_ids(proc, [it["template"] for it in items])
+    out, t0 = {}, time.time()
+    for i in range(0, len(items), bs):
+        chunk = items[i:i + bs]
+        images = [load_image(c["path"], res) for c in chunk]
+        texts = [chat_text(proc, c["question"], c["template"], "choice") for c in chunk]
+        enc = proc(text=texts, images=images, return_tensors="pt", padding=True).to(model.device)
+        with torch.no_grad():
+            try:
+                logits = model(**enc, logits_to_keep=1).logits[:, -1]          # last position only (saves memory)
+            except TypeError:
+                logits = model(**enc).logits[:, -1]
+            logp = torch.log_softmax(logits.float(), dim=-1).cpu()
+        for row, c in enumerate(chunk):
+            need = {tid for ids in table[c["template"]].values() for tid in ids}
+            best, _ = formats.best_candidate({t: float(logp[row, t]) for t in need}, table[c["template"]])
+            out[c["key"]] = best
+        if (i // bs) % 20 == 0:
+            print(f"  choice {i + len(chunk)}/{len(items)}", flush=True)
+    torch.cuda.synchronize()
+    return out, (time.time() - t0) / max(1, len(items))
+
+
+def predict(model, proc, items, res, bs, method):
+    """-> (raw, normalised predictions, sec/item). Same call for every arm and every evaluation."""
+    raw, spe = run_choice(model, proc, items, res, bs) if method == "choice" else run_generate(model, proc, items, res, bs, method)
+    norm = dict(raw) if method == "choice" else {k: normalize_answer(v) for k, v in raw.items()}
+    return raw, norm, spe
+
+
+def dry_predict(items):
     """--dry-run stand-in: returns the true answer for every item (so scores must be 100%)."""
     for it in items:
         assert Path(it["path"]).exists(), f"missing image {it['path']}"
-    return {it["key"]: it["truth"] for it in items}, 0.0
+    raw = {it["key"]: it["truth"] for it in items}
+    return raw, dict(raw), 0.0
 
 
+def wrong_format_pct(raw, items, method):
+    if method == "choice":
+        return 0.0
+    n_bad = sum(not formats.strict_format_ok(raw[it["key"]], it["template"]) for it in items)
+    return round(100 * n_bad / len(items), 2)
+
+
+def load_choice(out, args):
+    """method/resolution: explicit flags win; otherwise the dev-format study's choice file."""
+    f = Path(out) / "eval_choice.json"
+    ch = json.load(open(f)) if f.exists() else {}
+    method = args.method or ch.get("method")
+    res = args.resolution or ch.get("resolution")
+    if args.cmd != "cost" and (not method or not res) and not args.dry_run:
+        sys.exit("no chosen method/resolution: run `dev-format` first (it writes eval_choice.json) or pass --method and --resolution.")
+    return method or "suffix", res or 224
+
+
+# ----------------------------------------------------------------------------- dev-set format study (Task A/B)
+def dev_items(args):
+    rows = read_jsonl(SPL / "train.jsonl")                         # DEV set = train split; never the test set
+    if args.max_questions:
+        rows = random.Random(0).sample(rows, min(args.max_questions, len(rows)))
+    items = [{"key": r["qid"], "path": img_path(r["scene_id"]), "question": r["question"], "template": r["template"],
+              "truth": r["answer"]} for r in rows]
+    return rows, items
+
+
+def score_run(rows, items, raw, norm, spe, method, res, dtype):
+    per_t = {}
+    for t in sorted({r["template"] for r in rows}):
+        per_t[t] = accuracy([r for r in rows if r["template"] == t], norm)
+    return {"method": method, "resolution": res, "dtype": dtype, "n": len(rows), "acc_by_template_pct": per_t,
+            "macro_acc_pct": formats.macro(per_t), "overall_acc_pct": accuracy(rows, norm),
+            "wrong_format_pct": wrong_format_pct(raw, items, method), "sec_per_item": round(spe, 4),
+            "batch_size": None, "raw_examples": dict(list(raw.items())[:10])}
+
+
+def cmd_dev_format(args):
+    preflight(args)
+    rows, items = dev_items(args)
+    print(f"dev set: {len(rows)} questions from the train split, templates {sorted({r['template'] for r in rows})} "
+          "(no compare_cs: its questions were removed from train; ASSUMED to behave like the other yes/no templates)")
+    out = Path(args.out)
+    if args.dry_run:
+        raw, norm, spe = dry_predict(items)
+        rep = score_run(rows, items, raw, norm, spe, "dry-run", 0, "none")
+        print(json.dumps({k: rep[k] for k in ("acc_by_template_pct", "macro_acc_pct", "wrong_format_pct")}))
+        return
+    login_hf()
+    model, proc, dtype = load_model(args)
+    dn = dtype_name(dtype)
+    doc = {"PILOT_NOTE": "dev-set study on the TRAIN split; the test set is not used. Pilot numbers, one run each.",
+           "env": env_info(), "dtype": dn, "dev_set": {"split": "train", "n": len(rows)}, "runs": {}}
+
+    def run(method, res):
+        raw, norm, spe = predict(model, proc, items, res, args.batch_size, method)
+        rep = score_run(rows, items, raw, norm, spe, method, res, dn)
+        rep["batch_size"] = args.batch_size
+        doc["runs"][f"{method}@{res}"] = rep
+        jdump(out / "dev_format.json", doc)                                  # written as soon as it exists
+        print(f"{method}@{res}: macro {rep['macro_acc_pct']}  wrong-format {rep['wrong_format_pct']}%  {rep['sec_per_item']} s/item", flush=True)
+        return rep
+
+    base = args.base_resolution
+    res_main = {m: run(m, base) for m in ("suffix", "choice")}
+    run("legacy", base)                                                      # diagnostic only, never selectable
+    pm = formats.pick_method({m: {"macro_acc": r["macro_acc_pct"], "sec_per_item": r["sec_per_item"]} for m, r in res_main.items()}, tie_pts=1.0)
+    hi = run(pm["chosen"], args.compare_resolution)
+    pr = formats.pick_resolution({base: res_main[pm["chosen"]]["macro_acc_pct"], args.compare_resolution: hi["macro_acc_pct"]},
+                                 base=base, margin_pts=2.0)
+    doc["selection"] = {"method": pm, "resolution": pr,
+                        "rule": "method: highest dev macro accuracy, within 1 point is a tie -> faster; resolution: native unless the "
+                                "larger one is better by MORE than 2 macro points"}
+    jdump(out / "dev_format.json", doc)
+    jdump(out / "eval_choice.json", {"method": pm["chosen"], "resolution": pr["chosen"], "dtype": dn, "decided_on": "dev set (train split)",
+                                     "details": doc["selection"]})
+    print("CHOSEN:", pm["chosen"], pr["chosen"])
+
+
+# ----------------------------------------------------------------------------- zero-shot on the test set
 def cmd_zero_shot(args):
+    preflight(args)
+    out = Path(args.out)
+    method, res = load_choice(out, args)
     test = read_jsonl(SPL / "test.jsonl")
     edits = read_jsonl(SPL / "test_edits.jsonl") if (SPL / "test_edits.jsonl").exists() else []
     if args.held_out_only:
         test = [r for r in test if r["template"] == HELD_OUT]
     if args.max_questions:
-        rng = random.Random(0)
-        test = rng.sample(test, min(args.max_questions, len(test)))
+        test = random.Random(0).sample(test, min(args.max_questions, len(test)))
     keep = {r["qid"] for r in test}
     edits = [e for e in edits if e["qid"] in keep]
-    qtext = {r["qid"]: r["question"] for r in test}
+    qrow = {r["qid"]: r for r in test}
 
-    items = [{"key": r["qid"], "path": img_path(r["scene_id"]), "question": r["question"], "truth": r["answer"]} for r in test]
+    def item(key, path, q, truth):
+        return {"key": key, "path": path, "question": q["question"], "template": q["template"], "truth": truth}
+
+    items = [item(r["qid"], img_path(r["scene_id"]), r, r["answer"]) for r in test]
     for e in edits:
-        items.append({"key": e["relevant_scene"], "path": img_path(e["relevant_scene"], True), "question": qtext[e["qid"]], "truth": e["answers"]["relevant"]})
-        items.append({"key": e["irrelevant_scene"], "path": img_path(e["irrelevant_scene"], True), "question": qtext[e["qid"]], "truth": e["answers"]["irrelevant"]})
+        q = qrow[e["qid"]]
+        items.append(item(e["relevant_scene"], img_path(e["relevant_scene"], True), q, e["answers"]["relevant"]))
+        items.append(item(e["irrelevant_scene"], img_path(e["irrelevant_scene"], True), q, e["answers"]["irrelevant"]))
     shuf = []
     if not args.skip_shuffle:       # model-based shuffled-image baseline: right question, a DIFFERENT scene's image
         rng = random.Random(1)
@@ -219,50 +387,38 @@ def cmd_zero_shot(args):
             o = rng.choice(test)
             while o["scene_id"] == r["scene_id"]:
                 o = rng.choice(test)
-            shuf.append({"key": r["qid"] + "__shuf", "path": img_path(o["scene_id"]), "question": r["question"], "truth": r["answer"]})
+            shuf.append(item(r["qid"] + "__shuf", img_path(o["scene_id"]), r, r["answer"]))
         items += shuf
-    print(f"zero-shot items: {len(test)} originals, {2 * len(edits)} edited images, {len(shuf)} shuffled")
+    print(f"zero-shot items: {len(test)} originals, {2 * len(edits)} edited images, {len(shuf)} shuffled; method={method} resolution={res}")
 
+    dn = "none"
     if args.dry_run:
-        raw, spe = dry_inference(items)
+        raw, norm, spe = dry_predict(items)
     else:
         login_hf()
-        model, proc, _ = load_model(args)
-        raw, spe = run_inference(model, proc, items, args.resolution, args.batch_size)
-    norm = {k: normalize_answer(v) for k, v in raw.items()}
-
-    rep = {"PILOT_NOTE": "frozen-model reference (headroom). Pilot number, one run, greedy decoding.",
-           "model": MODEL, "resolution": args.resolution, "dry_run": args.dry_run, "env": env_info(),
+        model, proc, dtype = load_model(args)
+        dn = dtype_name(dtype)
+        raw, norm, spe = predict(model, proc, items, res, args.batch_size, method)
+    rep = {"PILOT_NOTE": "frozen-model reference (headroom). Pilot number, one run; method and resolution were chosen on the dev set.",
+           "model": MODEL, "method": method, "resolution": res, "dtype": dn, "dry_run": args.dry_run, "env": env_info(),
            "plain_accuracy_all_questions": plain_accuracy_report(test, norm, HELD_OUT),
            "joint_score_paired_subset": joint_report(edits, norm, HELD_OUT),
-           "shuffled_image_baseline": plain_accuracy_report(
-               [{**r, "qid": r["qid"] + "__shuf"} for r in test], norm, HELD_OUT) if shuf else None,
+           "shuffled_image_baseline": plain_accuracy_report([{**r, "qid": r["qid"] + "__shuf"} for r in test], norm, HELD_OUT) if shuf else None,
            "majority_baselines_from_stage3_for_comparison": "see reports/stage3_leakage.json",
            "timing": {"sec_per_example": round(spe, 4), "n_items": len(items), "batch_size": args.batch_size},
-           "raw_output_examples": dict(list(raw.items())[:15]),
-           "unparsed_outputs": sum(1 for v in norm.values() if not (v in ("yes", "no") or v.isdigit()))}
-    out = Path(args.out)
-    out.mkdir(parents=True, exist_ok=True)
+           "wrong_format_pct": wrong_format_pct(raw, items, method),
+           "raw_output_examples": dict(list(raw.items())[:15])}
     name = "zero_shot_dry_run.json" if args.dry_run else "zero_shot.json"
-    (out / name).write_text(json.dumps(rep, indent=2))
-    write_run_meta(out, vars(args), stage="4-zero-shot")
+    jdump(out / name, rep)
+    write_run_meta(out, vars(args), stage="5-zero-shot")
     print(json.dumps({k: rep[k] for k in ("plain_accuracy_all_questions", "joint_score_paired_subset", "shuffled_image_baseline", "timing")}, indent=2))
 
 
 # ----------------------------------------------------------------------------- training
-def make_train_batch(proc, rows, res, device):
-    """Chat prompt + answer; loss only on the answer tokens (prompt, image and padding masked)."""
-    proc.tokenizer.padding_side = "right"
+def make_train_batch(proc, rows, res, device, method):
     images = [load_image(img_path(r["scene_id"]), res) for r in rows]
-    prompts = [chat_text(proc, r["question"]) for r in rows]
-    full = [p + r["answer"] + "<|im_end|>" for p, r in zip(prompts, rows)]
-    enc_p = proc(text=prompts, images=images, return_tensors="pt", padding=True)
-    enc = proc(text=full, images=images, return_tensors="pt", padding=True)
-    labels = enc["input_ids"].clone()
-    labels[enc["attention_mask"] == 0] = -100
-    for i, n in enumerate(enc_p["attention_mask"].sum(1).tolist()):
-        labels[i, :n] = -100
-    enc["labels"] = labels
+    prompts = [chat_text(proc, r["question"], r["template"], method) for r in rows]     # same builder as evaluation
+    enc = build_train_batch(proc, prompts, [r["answer"] for r in rows], images)
     return {k: v.to(device) for k, v in enc.items()}
 
 
@@ -275,7 +431,7 @@ def train_on_batch(model, dtype, batch, opt, scaler):
     scaler.step(opt)
     scaler.update()
     opt.zero_grad(set_to_none=True)
-    return float(loss)
+    return loss.item()
 
 
 def make_opt(model, dtype, lr):
@@ -284,7 +440,7 @@ def make_opt(model, dtype, lr):
     return opt, torch.amp.GradScaler("cuda", enabled=(dtype == torch.float16))
 
 
-def train_steps(model, proc, dtype, rows, res, bs, epochs, lr, seed, max_steps=None):
+def train_steps(model, proc, dtype, rows, res, bs, epochs, lr, seed, method, max_steps=None):
     opt, scaler = make_opt(model, dtype, lr)
     rng, losses, step, t0 = random.Random(seed), [], 0, time.time()
     model.train()
@@ -292,7 +448,7 @@ def train_steps(model, proc, dtype, rows, res, bs, epochs, lr, seed, max_steps=N
         order = rows[:]
         rng.shuffle(order)
         for i in range(0, len(order), bs):
-            batch = make_train_batch(proc, order[i:i + bs], res, model.device)
+            batch = make_train_batch(proc, order[i:i + bs], res, model.device, method)
             losses.append(train_on_batch(model, dtype, batch, opt, scaler))
             step += 1
             if step % 10 == 0:
@@ -303,25 +459,33 @@ def train_steps(model, proc, dtype, rows, res, bs, epochs, lr, seed, max_steps=N
 
 
 def cmd_grid(args):
-    """Peak memory and seconds/step for one LoRA training step over resolution x batch size."""
+    """Peak memory and seconds/step for one LoRA training step over resolution x batch size. grid.json is written by this
+    function after EVERY row, so a killed session keeps what was measured; no transcription from logs."""
     plan = [(r, b) for r in args.grid_res for b in args.grid_bs]
     print("grid plan (resolution, batch):", plan)
     if args.dry_run:
         return
+    preflight(args)
     import torch
     login_hf()
+    method, _ = load_choice(Path(args.out), args)
+    seed_all(0)
     model, proc, dtype = load_model(args, for_training=True)
     pool = read_jsonl(SPL / "pool.jsonl")[: max(args.grid_bs) * 2]
     rows, oom_at = [], {}
+    doc = {"PILOT_NOTE": "measured on this GPU only; do not transfer to other GPUs", "complete": False, "env": env_info(),
+           "dtype": dtype_name(dtype), "lora_r": args.lora_r, "gradient_checkpointing": True, "prompt_method": method, "rows": rows}
+    gpath = Path(args.out) / "grid.json"
     for res, bs in plan:
         if res in oom_at and bs >= oom_at[res]:
             rows.append({"resolution": res, "batch": bs, "status": "skipped (smaller batch already OOM)"})
+            jdump(gpath, doc)
             continue
         try:
             torch.cuda.empty_cache()
             torch.cuda.reset_peak_memory_stats()
             t_pre = time.time()
-            batch = make_train_batch(proc, pool[:bs], res, model.device)
+            batch = make_train_batch(proc, pool[:bs], res, model.device, method)
             pre = time.time() - t_pre
             ntok = int(batch["attention_mask"].sum(1).float().mean())
             opt, scaler = make_opt(model, dtype, 1e-5)
@@ -332,31 +496,32 @@ def cmd_grid(args):
             for _ in range(args.grid_steps):                     # same batch re-used: pure compute time
                 train_on_batch(model, dtype, batch, opt, scaler)
             torch.cuda.synchronize()
-            sec = (time.time() - t) / args.grid_steps + pre     # add preprocessing (image load + tokenise) once per step
+            sec = (time.time() - t) / args.grid_steps + pre
             rows.append({"resolution": res, "batch": bs, "status": "ok", "peak_mem_gb": round(torch.cuda.max_memory_allocated() / 2 ** 30, 2),
                          "sec_per_step_incl_preprocess": round(sec, 3), "preprocess_sec_per_batch": round(pre, 3), "tokens_per_sample": ntok})
         except torch.cuda.OutOfMemoryError:
             oom_at[res] = min(oom_at.get(res, 10 ** 9), bs)
             rows.append({"resolution": res, "batch": bs, "status": "OOM"})
             torch.cuda.empty_cache()
+        jdump(gpath, doc)
         print(rows[-1], flush=True)
-    out = Path(args.out)
-    out.mkdir(parents=True, exist_ok=True)
-    (out / "grid.json").write_text(json.dumps({"PILOT_NOTE": "measured on this GPU only; do not transfer to other GPUs",
-                                               "env": env_info(), "dtype": str(dtype), "lora_r": args.lora_r,
-                                               "gradient_checkpointing": True, "rows": rows}, indent=2))
-    write_run_meta(out, vars(args), stage="4-grid")
+    doc["complete"] = True
+    jdump(gpath, doc)
+    write_run_meta(Path(args.out), vars(args), stage="5-grid")
 
 
 def cmd_cost(args):
     out = Path(args.out)
     grid = json.load(open(out / "grid.json"))
+    if not grid.get("complete", True) or "TRANSCRIBED" in grid:
+        print("WARNING: grid.json is incomplete or transcribed; rerun `grid`.")
     ok = [r for r in grid["rows"] if r["status"] == "ok"]
     if not ok:
         sys.exit("no successful grid rows; run `grid` first")
-    cfgs = [r for r in ok if r["resolution"] == args.cost_res and r["batch"] == args.cost_bs] or \
-           sorted(ok, key=lambda r: (-r["resolution"], -r["batch"]))[:1]
-    c = cfgs[0]
+    _, res = load_choice(out, args)
+    cres, cbs = args.cost_res or res, args.cost_bs
+    cands = [r for r in ok if r["resolution"] == cres]
+    c = ([r for r in cands if r["batch"] == cbs] or sorted(cands, key=lambda r: -r["batch"]) or sorted(ok, key=lambda r: (-r["resolution"], -r["batch"])))[0]
     zs = out / "zero_shot.json"
     if zs.exists():
         spe, src = json.load(open(zs))["timing"]["sec_per_example"], "measured in zero-shot"
@@ -371,77 +536,107 @@ def cmd_cost(args):
             {"name": "400 ex, 3 epochs, shortcut+random x3 seeds, difficulty+diversity x1", "n_train": 400, "epochs": 3, "runs": 8},
             {"name": "400 ex, 3 epochs, 4 arms x 3 seeds", "n_train": 400, "epochs": 3, "runs": 12},
             {"name": "1000 ex, 3 epochs, 4 arms x 3 seeds", "n_train": 1000, "epochs": 3, "runs": 12}]
-    res = extrapolate(sps, c["batch"], spe, n_eval, scen, budget_hours=args.budget_hours)
+    res_rows = extrapolate(sps, c["batch"], spe, n_eval, scen, budget_hours=args.budget_hours)
+    prev = ROOT / "reports" / "stage4" / "cost_extrapolation.json"
     rep = {"PILOT_NOTE": "extrapolation from measured step time; ASSUMED parts are labelled",
            "based_on": {"resolution": c["resolution"], "batch": c["batch"], "sec_per_step": sps, "peak_mem_gb": c["peak_mem_gb"],
-                        "sec_per_eval_example": spe, "sec_per_eval_example_source": src, "eval_items_per_run": n_eval,
-                        "gpu": grid["env"].get("gpu")},
-           "budget_hours": args.budget_hours, "scenarios": res,
+                        "dtype": grid.get("dtype"), "sec_per_eval_example": spe, "sec_per_eval_example_source": src,
+                        "eval_items_per_run": n_eval, "gpu": grid["env"].get("gpu")},
+           "budget_hours": args.budget_hours, "scenarios": res_rows,
+           "previous_stage4_scenarios_for_comparison": json.load(open(prev))["scenarios"] if prev.exists() else None,
+           "previous_stage4_based_on": json.load(open(prev))["based_on"] if prev.exists() else None,
            "caveat": "numbers are for this GPU; an A100 is several times faster than a T4, and model load (~2 min) is included per run"}
-    (out / "cost_extrapolation.json").write_text(json.dumps(rep, indent=2))
+    jdump(out / "cost_extrapolation.json", rep)
     print(json.dumps(rep, indent=2))
 
 
 def cmd_tiny(args):
     """OPTIONAL. One tiny fine-tune per arm, seed 0. Proves the code path runs; proves nothing else."""
     mode = args.exists_mode
-    man = json.load(open(ROOT / "data" / "manifests" / f"selection_{mode}_seed0.json"))
+    mpath = ROOT / "data" / "manifests" / f"selection_{mode}_seed0.json"
+    man = json.load(open(mpath))
     pool = {r["qid"]: r for r in read_jsonl(SPL / "pool.jsonl")}
     test = read_jsonl(SPL / "test.jsonl")
+    test_scenes = {r["scene_id"] for r in test}
+    method, res = load_choice(Path(args.out), args)
     rng = random.Random(0)
     held = rng.sample([r for r in test if r["template"] == HELD_OUT], args.tiny_eval_n)
     seen = rng.sample([r for r in test if r["template"] != HELD_OUT], args.tiny_eval_n)
     evalrows = held + seen
-    items = [{"key": r["qid"], "path": img_path(r["scene_id"]), "question": r["question"], "truth": r["answer"]} for r in evalrows]
+    items = [{"key": r["qid"], "path": img_path(r["scene_id"]), "question": r["question"], "template": r["template"],
+              "truth": r["answer"]} for r in evalrows]
     results = {"BANNER": "PIPELINE CHECK ONLY: one seed, tiny budget. This shows the code path runs end to end. "
                          "It is NOT evidence for or against the hypothesis; differences between arms are within noise.",
-               "exists_mode": mode, "env": env_info(), "arms": {}}
+               "exists_mode": mode, "selection_manifest": mpath.name, "selection_manifest_sha256": sha256_file(mpath),
+               "method": method, "resolution": res, "env": env_info(), "arms": {}}
+    for arm, qids in man["arms"].items():                      # arms as written by run_selectors.py; checked before any GPU work
+        missing = [q for q in qids if q not in pool]
+        leak = [q for q in qids if pool[q]["scene_id"] in test_scenes]
+        if missing or leak:
+            raise SystemExit(f"arm {arm}: {len(missing)} qids missing from pool, {len(leak)} on test scenes")
     if args.dry_run:
-        print("dry-run: arms", {a: len(v) for a, v in man["arms"].items()}, "eval items", len(items))
+        print("dry-run: arms", {a: len(v) for a, v in man["arms"].items()}, "eval items", len(items), "manifest", mpath.name)
         return
+    preflight(args)
     login_hf()
     import torch
     for arm, qids in man["arms"].items():
         print(f"=== arm {arm}")
+        seed_all(0)                                            # LoRA init, dropout, shuffling
         model, proc, dtype = load_model(args, for_training=True)
         train_rows = [pool[q] for q in qids][: args.tiny_n]
-        with model.disable_adapter():                      # same eval subset before training, for reference
-            raw0, _ = run_inference(model, proc, items, args.resolution, args.batch_size)
-        tr = train_steps(model, proc, dtype, train_rows, args.resolution, args.tiny_bs, 1, args.lr, seed=0)
-        raw1, spe = run_inference(model, proc, items, args.resolution, args.batch_size)
-        acc = lambda raw: plain_accuracy_report(evalrows, {k: normalize_answer(v) for k, v in raw.items()}, HELD_OUT)
-        results["arms"][arm] = {"n_train": len(train_rows), "steps": tr["steps"], "train_seconds": round(tr["seconds"], 1),
+        with model.disable_adapter():                          # same eval subset before training, for reference
+            raw0, norm0, _ = predict(model, proc, items, res, args.batch_size, method)
+        tr = train_steps(model, proc, dtype, train_rows, res, args.tiny_bs, 1, args.lr, seed=0, method=method)
+        raw1, norm1, spe = predict(model, proc, items, res, args.batch_size, method)
+        results["arms"][arm] = {"n_train": len(train_rows), "train_qids_sha": __import__("hashlib").sha256(",".join(qids).encode()).hexdigest(),
+                                "steps": tr["steps"], "train_seconds": round(tr["seconds"], 1), "dtype": dtype_name(dtype),
+                                "lora": lora_report(model),
                                 "loss_first10": round(sum(tr["losses"][:10]) / min(10, len(tr["losses"])), 4),
                                 "loss_last10": round(sum(tr["losses"][-10:]) / min(10, len(tr["losses"])), 4),
-                                "before": acc(raw0), "after": acc(raw1)}
+                                "before": plain_accuracy_report(evalrows, norm0, HELD_OUT), "after": plain_accuracy_report(evalrows, norm1, HELD_OUT)}
+        jdump(Path(args.out) / "tiny_finetune.json", results)  # saved after EVERY arm: a lost session costs at most one arm
         del model
         torch.cuda.empty_cache()
         print(results["arms"][arm])
-    out = Path(args.out)
-    out.mkdir(parents=True, exist_ok=True)
-    (out / "tiny_finetune.json").write_text(json.dumps(results, indent=2))
-    write_run_meta(out, vars(args), stage="4-tiny-finetune")
+    write_run_meta(Path(args.out), vars(args), stage="5-tiny-finetune")
+
+
+def cmd_check_env(args):
+    inst = formats.check_pins(PINS)
+    info = env_info()
+    info["dtype_would_be"] = None
+    try:
+        info["dtype_would_be"] = dtype_name(pick_dtype(args))
+    except Exception:
+        pass
+    print(json.dumps(info, indent=2))
+    jdump(Path(args.out) / "env_check.json", {"versions": inst, "env": info})
 
 
 # ----------------------------------------------------------------------------- cli
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("cmd", choices=["prepare", "zero-shot", "grid", "cost", "tiny-finetune", "all"])
-    ap.add_argument("--out", default=str(ROOT / "reports" / "stage4"))
+    ap.add_argument("cmd", choices=["check-env", "prepare", "dev-format", "zero-shot", "grid", "cost", "tiny-finetune"])
+    ap.add_argument("--out", default=DEFAULT_OUT, help="results directory (Kaggle default: /kaggle/working/stage5_results)")
     ap.add_argument("--dry-run", action="store_true")
-    ap.add_argument("--dtype", default="auto", choices=["auto", "fp16", "bf16"])
+    ap.add_argument("--skip-version-check", action="store_true")
+    ap.add_argument("--dtype", default="auto", choices=["auto", "fp16", "bf16"], help="auto = fp16 below compute capability 8.0")
     ap.add_argument("--load-4bit", action="store_true", help="QLoRA-style 4-bit base (needs bitsandbytes); use if fp16 OOMs")
-    ap.add_argument("--resolution", type=int, default=448, help="image side in pixels, multiple of 28 (224/336/448)")
+    ap.add_argument("--method", choices=["suffix", "choice", "legacy"], default=None, help="default: the dev-format study's choice")
+    ap.add_argument("--resolution", type=int, default=None, help="image side, multiple of 28; default: the dev-format study's choice")
+    ap.add_argument("--base-resolution", type=int, default=224, help="dev-format: native resolution")
+    ap.add_argument("--compare-resolution", type=int, default=336, help="dev-format: larger resolution to compare")
     ap.add_argument("--batch-size", type=int, default=16, help="inference batch size")
     ap.add_argument("--skip-edits", action="store_true", help="prepare: skip the slow edit build (no joint score then)")
     ap.add_argument("--held-out-only", action="store_true")
-    ap.add_argument("--max-questions", type=int, default=None, help="zero-shot smoke test on a random subset")
+    ap.add_argument("--max-questions", type=int, default=None, help="smoke test on a random subset")
     ap.add_argument("--skip-shuffle", action="store_true")
     ap.add_argument("--lora-r", type=int, default=16)
     ap.add_argument("--grid-res", type=int, nargs="+", default=[224, 336, 448])
     ap.add_argument("--grid-bs", type=int, nargs="+", default=[1, 2, 4, 8])
     ap.add_argument("--grid-steps", type=int, default=5)
-    ap.add_argument("--cost-res", type=int, default=448)
+    ap.add_argument("--cost-res", type=int, default=None, help="default: the chosen resolution")
     ap.add_argument("--cost-bs", type=int, default=4)
     ap.add_argument("--sec-per-eval", type=float, default=0.25)
     ap.add_argument("--budget-hours", type=float, default=20.0)
@@ -451,16 +646,9 @@ def main():
     ap.add_argument("--tiny-eval-n", type=int, default=100, help="held-out AND seen eval questions each")
     ap.add_argument("--lr", type=float, default=1e-4)
     args = ap.parse_args()
-    if args.cmd in ("prepare", "all"):
-        cmd_prepare(args)
-    if args.cmd in ("zero-shot", "all"):
-        cmd_zero_shot(args)
-    if args.cmd in ("grid", "all"):
-        cmd_grid(args)
-    if args.cmd in ("cost", "all") and not args.dry_run:
-        cmd_cost(args)
-    if args.cmd == "tiny-finetune":
-        cmd_tiny(args)
+    Path(args.out).mkdir(parents=True, exist_ok=True)
+    {"check-env": cmd_check_env, "prepare": cmd_prepare, "dev-format": cmd_dev_format, "zero-shot": cmd_zero_shot,
+     "grid": cmd_grid, "cost": cmd_cost, "tiny-finetune": cmd_tiny}[args.cmd](args)
 
 
 if __name__ == "__main__":
