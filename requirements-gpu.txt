@@ -1,7 +1,15 @@
-# Exact versions of the GPU environment (non-torch packages are ENFORCED by the version check; torch is recorded and warned on only).
-# Only the two versions below were measured in the Colab run (reports/stage4/zero_shot.json "env").
-# The rest are NOT pinned yet: run `python scripts/freeze_env.py` on the GPU machine and add its lines here.
+# Exact versions of the GPU environment. Non-torch packages are ENFORCED by the version check; torch is recorded and warned on only.
+# Source: reports/stage5/env_freeze.json (Kaggle T4 run, python 3.13.16). Transformers and peft also match the earlier Colab run.
 transformers==5.22.1
 peft==0.21.2
-# torch==2.14.1+cu130   (Colab run; informational, never forced)
+accelerate==1.15.0
+huggingface_hub==1.33.0
+safetensors==0.8.0
+tokenizers==0.23.3
+pillow==13.0.0
+numpy==2.1.3
+pyyaml==6.0.3
+# torch==2.11.0+cu130   (Kaggle Stage 5 run; Colab Stage 4 had 2.14.1+cu130; informational, never forced)
+# torchvision==0.26.0+cu130 (informational)
+# bitsandbytes and qwen-vl-utils were not installed in the Stage 5 run and are not used (no 4-bit, no qwen-vl-utils).
 # torchao must be uninstalled on Colab (0.10 is rejected by peft); scripts/install_pinned.py does it.

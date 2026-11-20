@@ -79,46 +79,64 @@ Label-count checks all seeds: `{'matched_random_label_counts_identical_to_shortc
 - Count arms: shortcut_aware: gap 3.44, d=1 100.0%, objects 5.94; matched_random: gap 2.49, d=1 70.42%, objects 5.86; graded_top_gap_(diagnostic): gap 5.03, d=1 100.0%, objects 6.96
 
 ## 5b. Answer-format study on the DEV set (train split; the test set was not used to choose anything)
-NOT RUN yet (needs the GPU notebook).
+dev n = 766; no compare_cs in the dev set (ASSUMED to behave like the other yes/no templates); dtype float16.
+| run | macro acc % | per template | wrong-format % | sec/item |
+|---|---|---|---|---|
+| suffix@224 | 93.55 | {'compare_shape': 93.7, 'count_cs': 88.97, 'exists_cs': 97.99} | 0.0 | 0.0799 |
+| choice@224 | 93.55 | {'compare_shape': 93.7, 'count_cs': 88.97, 'exists_cs': 97.99} | 0.0 | 0.0718 |
+| legacy@224 | 75.29 | {'compare_shape': 81.89, 'count_cs': 89.35, 'exists_cs': 54.62} | 40.47 | 0.085 |
+| choice@336 | 95.38 | {'compare_shape': 96.06, 'count_cs': 90.87, 'exists_cs': 99.2} | 0.0 | 0.1459 |
+
+Chosen: `choice` at 224 px. Rule: method: highest dev macro accuracy, within 1 point is a tie -> faster; resolution: native unless the larger one is better by MORE than 2 macro points. `legacy` (old one-size suffix, free generation) is a diagnostic only.
 
 ## 6. Headroom: frozen model on the held-out set (one greedy run)
-Model `Qwen/Qwen2.5-VL-3B-Instruct`, 448 px, method `old one-size suffix (Stage 4)`, dtype `auto (probably bf16 on T4; not recorded)`.
-- Plain accuracy, all questions: held-out 47.6% (n=500), seen 70.67% (n=1500); by template `{'compare_cs': 47.6, 'compare_shape': 71.2, 'count_cs': 93.0, 'exists_cs': 47.8}`.
-- Joint score, paired subset: held-out 2.82% (n=355), seen 43.74% (n=1278).
-- Shuffled-image control: held-out 22.2%, seen 25.73%.
-- Caveat: replies like `0` or `Yes, 1` to yes/no questions are scored wrong, so low exists/compare accuracy may be answer-format failure, not ability (fixed in Stage 5; rerun pending).
+Model `Qwen/Qwen2.5-VL-3B-Instruct`, 224 px, method `choice`, dtype `float16`.
+- Plain accuracy, all questions: held-out 95.0% (n=500), seen 93.73% (n=1500); by template `{'compare_cs': 95.0, 'compare_shape': 93.4, 'count_cs': 89.0, 'exists_cs': 98.8}`.
+- Joint score, paired subset: held-out 60.0% (n=355), seen 75.2% (n=1278).
+- Shuffled-image control: held-out 51.4%, seen 43.53%.
+- Wrong-format rate with the chosen method: 0.0%.
 
-**Count headroom:** frozen count_cs accuracy is 93.0%, so count has little room to improve. This is a finding to raise with the supervisor; no workaround was applied.
+Before (Stage 4 format) vs after (Stage 5), plain accuracy by template: compare_cs: 47.6 -> 95.0; compare_shape: 71.2 -> 93.4; count_cs: 93.0 -> 89.0; exists_cs: 47.8 -> 98.8
+
+### 6b. Headroom and the primary metric (all numbers from the files above; pilot numbers)
+- Plain accuracy on held-out compare_cs: 95.0% (n=500), so at most 5.0 points are left to gain. The frozen model's seen-template accuracy is 93.73%, i.e. the held-out template is not harder than the seen ones for the frozen model.
+- A 3-point gain on plain accuracy would remove 60% of all remaining held-out errors. The current test set detects about 5.83 points (plain, 80% power, assumed seed sd), which is more than the 5.0 points available: plain accuracy cannot show the 3-point effect here.
+- Joint score on the paired held-out subset: 60.0% (n=355), leaving 40.0 points. Components: original 92.96%, relevant edit 67.32%, irrelevant edit 93.52%. The relevant edit is the weak part (seen 82.63% vs held-out 67.32%) (interpretation, not measured: answering the original right without tracking the operation would fail the relevant edit).
+- The joint score detects about 8.24 points at 80% power; its headroom is large enough for that.
+- Count: frozen count_cs is 89.0% (seen), so count has about 11.0 points of headroom.
+- **Decision needed (not made here):** which metric is primary, plain held-out accuracy or the joint score. The protocol must state this before any arm is trained. The 3-point margin was written for plain accuracy; with this headroom, plain accuracy is near ceiling. Options (a change to the frozen design, so the user decides): keep plain as primary and accept it cannot detect 3 points; make joint primary; or report both with joint as the confirmatory test. No change has been made.
 
 ## 7. Memory and speed (measured on the GPU named in the file)
-NOTE: this grid was transcribed by hand from a Colab log (original file lost); its dtype label was an assumption. Rerun pending.
+dtype `float16`, GPU `Tesla T4`, complete=True.
 
 | resolution | batch | status | peak GB | sec/step |
 |---|---|---|---|---|
-| 224 | 1 | ok | 8.62 | 1.163 |
-| 224 | 2 | ok | 9.84 | 2.015 |
-| 224 | 4 | ok | 12.29 | 3.793 |
+| 224 | 1 | ok | 8.55 | 0.526 |
+| 224 | 2 | ok | 9.72 | 0.538 |
+| 224 | 4 | ok | 11.89 | 0.852 |
 | 224 | 8 | OOM |  |  |
-| 336 | 1 | ok | 9.89 | 2.005 |
-| 336 | 2 | ok | 12.32 | 4.037 |
+| 336 | 1 | ok | 9.72 | 0.575 |
+| 336 | 2 | ok | 12.0 | 0.878 |
 | 336 | 4 | OOM |  |  |
 | 336 | 8 | skipped (smaller batch already OOM) |  |  |
-| 448 | 1 | ok | 11.69 | 3.636 |
+| 448 | 1 | ok | 11.36 | 0.793 |
 | 448 | 2 | OOM |  |  |
 | 448 | 4 | skipped (smaller batch already OOM) |  |  |
 | 448 | 8 | skipped (smaller batch already OOM) |  |  |
 
-Zero-shot eval speed 1.7746 s/example (measured in zero-shot). Budget 20.0 GPU-hours. Extrapolation uses 448 px, batch 1, 3.636 s/step.
+Zero-shot eval speed 0.0702 s/example (measured in zero-shot). Budget 20.0 GPU-hours. Extrapolation uses 224 px, batch 4, 0.852 s/step.
 
 | scenario | GPU-hours | % of budget | fits |
 |---|---|---|---|
-| pilot tiny fine-tune (400 ex, 1 epoch, 4 arms x 1 seed) | 16.08 | 80.4 | True |
-| 400 ex, 3 epochs, 4 arms x 1 seed | 19.31 | 96.5 | True |
-| 400 ex, 3 epochs, shortcut+random x3 seeds, difficulty+diversity x1 | 38.62 | 193.1 | False |
-| 400 ex, 3 epochs, 4 arms x 3 seeds | 57.92 | 289.6 | False |
-| 1000 ex, 3 epochs, 4 arms x 3 seeds | 79.74 | 398.7 | False |
+| pilot tiny fine-tune (400 ex, 1 epoch, 4 arms x 1 seed) | 0.79 | 4.0 | True |
+| 400 ex, 3 epochs, 4 arms x 1 seed | 0.98 | 4.9 | True |
+| 400 ex, 3 epochs, shortcut+random x3 seeds, difficulty+diversity x1 | 1.97 | 9.8 | True |
+| 400 ex, 3 epochs, 4 arms x 3 seeds | 2.95 | 14.8 | True |
+| 1000 ex, 3 epochs, 4 arms x 3 seeds | 4.23 | 21.2 | True |
 
 T4 numbers do not transfer to other GPUs.
+
+Previous (Stage 4, 448 px, old grid) vs now, GPU-hours: pilot tiny fine-tune (400 ex, 1 epoch, 4: 16.08 -> 0.79; 400 ex, 3 epochs, 4 arms x 1 seed: 19.31 -> 0.98; 400 ex, 3 epochs, shortcut+random x3 see: 38.62 -> 1.97; 400 ex, 3 epochs, 4 arms x 3 seeds: 57.92 -> 2.95; 1000 ex, 3 epochs, 4 arms x 3 seeds: 79.74 -> 4.23
 
 ## 8. Held-out test-size proposal (power calculation; psi and seed sd are ASSUMED)
 - Target: 3-point gain, alpha 0.05, power 0.8. Headline case `{'psi_plain': 0.2, 'psi_joint': 0.3, 'sigma': 0.01, 'k': 5}`.
@@ -133,9 +151,10 @@ Items below come from the measurements above unless marked otherwise.
 1. **Exists label confound.** d=1 implies "no" for exists (structural). Quotas equalise labels across arms, but any exists effect is entangled with the selector. A fixed-shared-base mode exists behind a config switch.
 2. **Weak shortcut contrast on count.** Matched random already has a high d=1 share on count (see section 5: shortcut arm 100% vs matched random about 70%), so the contrast is modest. Strict or graded d are options, not implemented; graded d also raises object count (a difficulty confound).
 3. **Underpowered test set.** 500 held-out scenes detect only about 6 to 8 points; the proposal is several thousand scenes. If seed sd exceeds the ceiling, no test size works (sd is ASSUMED until measured).
-4. **GPU budget.** On a T4 only batch 1 at 448 px fits; the multi-seed plan exceeds the 20 GPU-hour budget (section 7). Evaluation dominates cost. A faster GPU or a smaller evaluation is needed.
+4. **GPU budget.** Scenarios over the 20.0 GPU-hour budget: none. Largest scenario: 4.23 GPU-hours. See section 7.
+4b. **Headroom.** The frozen model is near ceiling on plain held-out accuracy (section 6b); the primary metric must be fixed in the protocol.
 5. **Training code never run end to end on a GPU.** `tiny-finetune` is untested on a GPU. Stage 5 reviewed it (loss mask, fp32 LoRA adapters with fp16 GradScaler, seeds, manifest checks) with CPU tests only.
-6. **Answer-format failures.** Stage 4 outputs like `0` for yes/no questions were scored wrong; the Stage 5 fix is written but its GPU run is pending.
+6. **Answer format.** Fixed in Stage 5 (per-template instruction or choice scoring, chosen on the dev set); see sections 5b and 6.
 7. **Synthetic-to-real gap and one operation combination.** One held-out combination (compare_cs) in simple 2D scenes; no claim beyond this pilot (not measured here).
-8. **Library drift.** Colab ships newer transformers/peft than local; `torchao` had to be uninstalled. `requirements-gpu.txt` pins transformers and peft only (the two measured); the rest is pinned after `scripts/freeze_env.py` runs on the GPU machine.
+8. **Library drift.** Colab ships newer transformers/peft than local; `torchao` had to be uninstalled. Kaggle (torch 2.11.0+cu130) and the earlier Colab run (torch 2.14.1+cu130) differ in torch; see `requirements-gpu.txt` and `reports/stage5/env_freeze.json`.
 9. **dtype.** The Stage 4 runs probably used emulated bf16 on the T4 (torch reported bf16 as supported); Stage 5 forces fp16 below compute capability 8.0. Stage 4 speed numbers may therefore not match Stage 5.

@@ -106,6 +106,21 @@ def main():
         cc = zs["plain_accuracy_all_questions"]["by_template_pct"].get("count_cs")
         if cc is not None and cc >= 90:
             L += [f"**Count headroom:** frozen count_cs accuracy is {cc}%, so count has little room to improve. This is a finding to raise with the supervisor; no workaround was applied.", ""]
+        if stage5_zs:
+            ho, jh = p["held_out_pct"], j["held_out"]
+            md = pw["min_detectable_gain_points_at_80pct_power"]
+            L += ["### 6b. Headroom and the primary metric (all numbers from the files above; pilot numbers)",
+                  f"- Plain accuracy on held-out compare_cs: {ho}% (n={p['n_held_out']}), so at most {round(100 - ho, 2)} points are left to gain. "
+                  f"The frozen model's seen-template accuracy is {p['seen_pct']}%, i.e. the held-out template is not harder than the seen ones for the frozen model.",
+                  f"- A 3-point gain on plain accuracy would remove {round(3 / (100 - ho) * 100)}% of all remaining held-out errors. "
+                  f"The current test set detects about {md['plain_n=500_sigma=0.01_k=5']} points (plain, 80% power, assumed seed sd), which is more than the {round(100 - ho, 2)} points available: plain accuracy cannot show the 3-point effect here.",
+                  f"- Joint score on the paired held-out subset: {jh['joint_pct']}% (n={jh['n_paired']}), leaving {round(100 - jh['joint_pct'], 2)} points. "
+                  f"Components: original {jh['original_pct']}%, relevant edit {jh['relevant_edit_pct']}%, irrelevant edit {jh['irrelevant_edit_pct']}%. "
+                  f"The relevant edit is the weak part (seen {j['seen']['relevant_edit_pct']}% vs held-out {jh['relevant_edit_pct']}%) (interpretation, not measured: answering the original right without tracking the operation would fail the relevant edit).",
+                  f"- The joint score detects about {md['joint_n=355_sigma=0.01_k=5']} points at 80% power; its headroom is large enough for that.",
+                  "- Count: frozen count_cs is %s%% (seen), so count has about %s points of headroom." % (p["by_template_pct"]["count_cs"], round(100 - p["by_template_pct"]["count_cs"], 2)),
+                  "- **Decision needed (not made here):** which metric is primary, plain held-out accuracy or the joint score. The protocol must state this before any arm is trained. "
+                  "The 3-point margin was written for plain accuracy; with this headroom, plain accuracy is near ceiling. Options (a change to the frozen design, so the user decides): keep plain as primary and accept it cannot detect 3 points; make joint primary; or report both with joint as the confirmatory test. No change has been made.", ""]
     else:
         L += ["NOT RUN.", ""]
 
@@ -140,12 +155,14 @@ def main():
           "1. **Exists label confound.** d=1 implies \"no\" for exists (structural). Quotas equalise labels across arms, but any exists effect is entangled with the selector. A fixed-shared-base mode exists behind a config switch.",
           "2. **Weak shortcut contrast on count.** Matched random already has a high d=1 share on count (see section 5: shortcut arm 100% vs matched random about 70%), so the contrast is modest. Strict or graded d are options, not implemented; graded d also raises object count (a difficulty confound).",
           "3. **Underpowered test set.** 500 held-out scenes detect only about 6 to 8 points; the proposal is several thousand scenes. If seed sd exceeds the ceiling, no test size works (sd is ASSUMED until measured).",
-          "4. **GPU budget.** On a T4 only batch 1 at 448 px fits; the multi-seed plan exceeds the 20 GPU-hour budget (section 7). Evaluation dominates cost. A faster GPU or a smaller evaluation is needed.",
+          ("4. **GPU budget.** " + (("Scenarios over the %s GPU-hour budget: %s." % (co["budget_hours"], ", ".join(s["name"] for s in co["scenarios"] if not s["fits_budget"]) or "none"))
+                                    if co else "no cost file") + " Largest scenario: %s GPU-hours. See section 7." % (max(s["total_gpu_hours"] for s in co["scenarios"]) if co else "n/a")),
+          "4b. **Headroom.** The frozen model is near ceiling on plain held-out accuracy (section 6b); the primary metric must be fixed in the protocol.",
           "5. **Training code never run end to end on a GPU.** `tiny-finetune` is untested on a GPU. Stage 5 reviewed it (loss mask, fp32 LoRA adapters with fp16 GradScaler, seeds, manifest checks) with CPU tests only.",
           ("6. **Answer format.** Fixed in Stage 5 (per-template instruction or choice scoring, chosen on the dev set); see sections 5b and 6." if stage5_zs else
           "6. **Answer-format failures.** Stage 4 outputs like `0` for yes/no questions were scored wrong; the Stage 5 fix is written but its GPU run is pending."),
           "7. **Synthetic-to-real gap and one operation combination.** One held-out combination (compare_cs) in simple 2D scenes; no claim beyond this pilot (not measured here).",
-          "8. **Library drift.** Colab ships newer transformers/peft than local; `torchao` had to be uninstalled. `requirements-gpu.txt` pins transformers and peft only (the two measured); the rest is pinned after `scripts/freeze_env.py` runs on the GPU machine.",
+          "8. **Library drift.** Colab ships newer transformers/peft than local; `torchao` had to be uninstalled. Kaggle (torch 2.11.0+cu130) and the earlier Colab run (torch 2.14.1+cu130) differ in torch; see `requirements-gpu.txt` and `reports/stage5/env_freeze.json`.",
           "9. **dtype.** The Stage 4 runs probably used emulated bf16 on the T4 (torch reported bf16 as supported); Stage 5 forces fp16 below compute capability 8.0. Stage 4 speed numbers may therefore not match Stage 5.", ""]
     (R / "pilot_report.md").write_text("\n".join(L))
     print(f"wrote {R / 'pilot_report.md'}")

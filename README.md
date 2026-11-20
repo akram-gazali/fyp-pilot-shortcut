@@ -48,7 +48,7 @@ and the old one-size suffix as a diagnostic. Rule (fixed before the run): highes
 method wins. The resolution is 224 px unless 336 px is better by more than 2 macro-accuracy points. The choice is written to `eval_choice.json` and the
 **same method is applied to every arm**; the section of `reports/pilot_report.md` titled "Answer-format study" records the result and the reason
 (not filled until the GPU run). The dev set has no compare_cs questions (ASSUMED to behave like the other yes/no templates).
-Status: Stage 4 zero-shot (old format) and a hand-transcribed Stage 4 grid are in `reports/stage4/`; the Stage 5 GPU results are pending.
+Status: Stage 5 GPU results (Kaggle T4, fp16) are in `reports/stage5/`: answer format `choice` at 224 px chosen on the dev set, frozen-model headroom, grid and cost. `reports/stage4/` keeps the old-format zero-shot for comparison. The tiny fine-tune has not been run on a GPU. See `reports/pilot_report.md` section 6b: the primary metric (plain vs joint) must be fixed in the protocol.
 GPU code paths are CPU-tested only (`tests/test_stage5*.py`); the tiny fine-tune has never run on a GPU.
 
 Optional: `scripts/tune_generator.py` (generator tuning on separate seeds, no rendering).
