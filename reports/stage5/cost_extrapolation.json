@@ -24,7 +24,8 @@
       "total_hours": 0.199,
       "total_gpu_hours": 0.79,
       "share_of_budget_pct": 4.0,
-      "fits_budget": true
+      "fits_budget": true,
+      "eval_items_per_run": 7266
     },
     {
       "name": "400 ex, 3 epochs, 4 arms x 1 seed",
@@ -37,7 +38,8 @@
       "total_hours": 0.246,
       "total_gpu_hours": 0.98,
       "share_of_budget_pct": 4.9,
-      "fits_budget": true
+      "fits_budget": true,
+      "eval_items_per_run": 7266
     },
     {
       "name": "400 ex, 3 epochs, shortcut+random x3 seeds, difficulty+diversity x1",
@@ -50,7 +52,8 @@
       "total_hours": 0.246,
       "total_gpu_hours": 1.97,
       "share_of_budget_pct": 9.8,
-      "fits_budget": true
+      "fits_budget": true,
+      "eval_items_per_run": 7266
     },
     {
       "name": "400 ex, 3 epochs, 4 arms x 3 seeds",
@@ -63,7 +66,8 @@
       "total_hours": 0.246,
       "total_gpu_hours": 2.95,
       "share_of_budget_pct": 14.8,
-      "fits_budget": true
+      "fits_budget": true,
+      "eval_items_per_run": 7266
     },
     {
       "name": "1000 ex, 3 epochs, 4 arms x 3 seeds",
@@ -76,7 +80,68 @@
       "total_hours": 0.353,
       "total_gpu_hours": 4.23,
       "share_of_budget_pct": 21.2,
-      "fits_budget": true
+      "fits_budget": true,
+      "eval_items_per_run": 7266
+    },
+    {
+      "name": "400 ex, 3 epochs, 4 arms x 3 seeds, test set 3x",
+      "n_train": 400,
+      "epochs": 3,
+      "runs": 12,
+      "test_scale": 3,
+      "steps": 300,
+      "train_hours": 0.071,
+      "eval_hours": 0.425,
+      "total_hours": 0.529,
+      "total_gpu_hours": 6.35,
+      "share_of_budget_pct": 31.8,
+      "fits_budget": true,
+      "eval_items_per_run": 21798
+    },
+    {
+      "name": "1000 ex, 3 epochs, 4 arms x 3 seeds, test set 3x",
+      "n_train": 1000,
+      "epochs": 3,
+      "runs": 12,
+      "test_scale": 3,
+      "steps": 750,
+      "train_hours": 0.177,
+      "eval_hours": 0.425,
+      "total_hours": 0.636,
+      "total_gpu_hours": 7.63,
+      "share_of_budget_pct": 38.2,
+      "fits_budget": true,
+      "eval_items_per_run": 21798
+    },
+    {
+      "name": "400 ex, 3 epochs, 4 arms x 3 seeds, test set 5x",
+      "n_train": 400,
+      "epochs": 3,
+      "runs": 12,
+      "test_scale": 5,
+      "steps": 300,
+      "train_hours": 0.071,
+      "eval_hours": 0.708,
+      "total_hours": 0.813,
+      "total_gpu_hours": 9.75,
+      "share_of_budget_pct": 48.8,
+      "fits_budget": true,
+      "eval_items_per_run": 36330
+    },
+    {
+      "name": "1000 ex, 3 epochs, 4 arms x 3 seeds, test set 5x",
+      "n_train": 1000,
+      "epochs": 3,
+      "runs": 12,
+      "test_scale": 5,
+      "steps": 750,
+      "train_hours": 0.177,
+      "eval_hours": 0.708,
+      "total_hours": 0.919,
+      "total_gpu_hours": 11.03,
+      "share_of_budget_pct": 55.2,
+      "fits_budget": true,
+      "eval_items_per_run": 36330
     }
   ],
   "previous_stage4_scenarios_for_comparison": [

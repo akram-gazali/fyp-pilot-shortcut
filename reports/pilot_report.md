@@ -104,7 +104,8 @@ Before (Stage 4 format) vs after (Stage 5), plain accuracy by template: compare_
 - Joint score on the paired held-out subset: 60.0% (n=355), leaving 40.0 points. Components: original 92.96%, relevant edit 67.32%, irrelevant edit 93.52%. The relevant edit is the weak part (seen 82.63% vs held-out 67.32%) (interpretation, not measured: answering the original right without tracking the operation would fail the relevant edit).
 - The joint score detects about 8.24 points at 80% power; its headroom is large enough for that.
 - Count: frozen count_cs is 89.0% (seen), so count has about 11.0 points of headroom.
-- **Decision needed (not made here):** which metric is primary, plain held-out accuracy or the joint score. The protocol must state this before any arm is trained. The 3-point margin was written for plain accuracy; with this headroom, plain accuracy is near ceiling. Options (a change to the frozen design, so the user decides): keep plain as primary and accept it cannot detect 3 points; make joint primary; or report both with joint as the confirmatory test. No change has been made.
+- **Decision (project owner, 2026-11-20; see `PROTOCOL.md`):** primary metric = joint score; plain held-out accuracy is a declared secondary measure; seen accuracy stays the 2-point guard. It was chosen after this frozen-model headroom check and before any trained arm was evaluated. The 3-point margin is unchanged.
+- **Flag:** joint detectability (about 8.24 points, ASSUMED seed sd) is above the 3-point margin, so a 3-point joint effect cannot be detected at the current test size. Test-size scenarios are costed in section 7.
 
 ## 7. Memory and speed (measured on the GPU named in the file)
 dtype `float16`, GPU `Tesla T4`, complete=True.
@@ -133,8 +134,14 @@ Zero-shot eval speed 0.0702 s/example (measured in zero-shot). Budget 20.0 GPU-h
 | 400 ex, 3 epochs, shortcut+random x3 seeds, difficulty+diversity x1 | 1.97 | 9.8 | True |
 | 400 ex, 3 epochs, 4 arms x 3 seeds | 2.95 | 14.8 | True |
 | 1000 ex, 3 epochs, 4 arms x 3 seeds | 4.23 | 21.2 | True |
+| 400 ex, 3 epochs, 4 arms x 3 seeds, test set 3x | 6.35 | 31.8 | True |
+| 1000 ex, 3 epochs, 4 arms x 3 seeds, test set 3x | 7.63 | 38.2 | True |
+| 400 ex, 3 epochs, 4 arms x 3 seeds, test set 5x | 9.75 | 48.8 | True |
+| 1000 ex, 3 epochs, 4 arms x 3 seeds, test set 5x | 11.03 | 55.2 | True |
 
-T4 numbers do not transfer to other GPUs.
+T4 numbers do not transfer to other GPUs. Test sizes 3x and 5x multiply the evaluation items per run (7,266 now).
+
+Platforms (torch labelled per platform; the full study runs on Kaggle only): Stage 4 zero-shot: colab torch 2.14.1+cu130, Tesla T4; Stage 5: kaggle torch 2.11.0+cu130, Tesla T4
 
 Previous (Stage 4, 448 px, old grid) vs now, GPU-hours: pilot tiny fine-tune (400 ex, 1 epoch, 4: 16.08 -> 0.79; 400 ex, 3 epochs, 4 arms x 1 seed: 19.31 -> 0.98; 400 ex, 3 epochs, shortcut+random x3 see: 38.62 -> 1.97; 400 ex, 3 epochs, 4 arms x 3 seeds: 57.92 -> 2.95; 1000 ex, 3 epochs, 4 arms x 3 seeds: 79.74 -> 4.23
 
@@ -151,7 +158,7 @@ Items below come from the measurements above unless marked otherwise.
 1. **Exists label confound.** d=1 implies "no" for exists (structural). Quotas equalise labels across arms, but any exists effect is entangled with the selector. A fixed-shared-base mode exists behind a config switch.
 2. **Weak shortcut contrast on count.** Matched random already has a high d=1 share on count (see section 5: shortcut arm 100% vs matched random about 70%), so the contrast is modest. Strict or graded d are options, not implemented; graded d also raises object count (a difficulty confound).
 3. **Underpowered test set.** 500 held-out scenes detect only about 6 to 8 points; the proposal is several thousand scenes. If seed sd exceeds the ceiling, no test size works (sd is ASSUMED until measured).
-4. **GPU budget.** Scenarios over the 20.0 GPU-hour budget: none. Largest scenario: 4.23 GPU-hours. See section 7.
+4. **GPU budget.** Scenarios over the 20.0 GPU-hour budget: none. Largest scenario: 11.03 GPU-hours. See section 7.
 4b. **Headroom.** The frozen model is near ceiling on plain held-out accuracy (section 6b); the primary metric must be fixed in the protocol.
 5. **Training code never run end to end on a GPU.** `tiny-finetune` is untested on a GPU. Stage 5 reviewed it (loss mask, fp32 LoRA adapters with fp16 GradScaler, seeds, manifest checks) with CPU tests only.
 6. **Answer format.** Fixed in Stage 5 (per-template instruction or choice scoring, chosen on the dev set); see sections 5b and 6.

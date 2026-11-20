@@ -536,7 +536,15 @@ def cmd_cost(args):
             {"name": "400 ex, 3 epochs, shortcut+random x3 seeds, difficulty+diversity x1", "n_train": 400, "epochs": 3, "runs": 8},
             {"name": "400 ex, 3 epochs, 4 arms x 3 seeds", "n_train": 400, "epochs": 3, "runs": 12},
             {"name": "1000 ex, 3 epochs, 4 arms x 3 seeds", "n_train": 1000, "epochs": 3, "runs": 12}]
-    res_rows = extrapolate(sps, c["batch"], spe, n_eval, scen, budget_hours=args.budget_hours)
+    for k in (3, 5):          # larger test sets (power proposal): evaluation items scale with the number of test scenes
+        for n_tr in (400, 1000):
+            scen.append({"name": f"{n_tr} ex, 3 epochs, 4 arms x 3 seeds, test set {k}x", "n_train": n_tr, "epochs": 3, "runs": 12, "test_scale": k})
+    res_rows = []
+    for sc in scen:
+        k = sc.get("test_scale", 1)
+        r = extrapolate(sps, c["batch"], spe, n_eval * k, [sc], budget_hours=args.budget_hours)[0]
+        r["eval_items_per_run"] = n_eval * k
+        res_rows.append(r)
     prev = ROOT / "reports" / "stage4" / "cost_extrapolation.json"
     rep = {"PILOT_NOTE": "extrapolation from measured step time; ASSUMED parts are labelled",
            "based_on": {"resolution": c["resolution"], "batch": c["batch"], "sec_per_step": sps, "peak_mem_gb": c["peak_mem_gb"],

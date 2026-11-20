@@ -119,8 +119,9 @@ def main():
                   f"The relevant edit is the weak part (seen {j['seen']['relevant_edit_pct']}% vs held-out {jh['relevant_edit_pct']}%) (interpretation, not measured: answering the original right without tracking the operation would fail the relevant edit).",
                   f"- The joint score detects about {md['joint_n=355_sigma=0.01_k=5']} points at 80% power; its headroom is large enough for that.",
                   "- Count: frozen count_cs is %s%% (seen), so count has about %s points of headroom." % (p["by_template_pct"]["count_cs"], round(100 - p["by_template_pct"]["count_cs"], 2)),
-                  "- **Decision needed (not made here):** which metric is primary, plain held-out accuracy or the joint score. The protocol must state this before any arm is trained. "
-                  "The 3-point margin was written for plain accuracy; with this headroom, plain accuracy is near ceiling. Options (a change to the frozen design, so the user decides): keep plain as primary and accept it cannot detect 3 points; make joint primary; or report both with joint as the confirmatory test. No change has been made.", ""]
+                  "- **Decision (project owner, 2026-11-20; see `PROTOCOL.md`):** primary metric = joint score; plain held-out accuracy is a declared secondary measure; seen accuracy stays the 2-point guard. "
+                  "It was chosen after this frozen-model headroom check and before any trained arm was evaluated. The 3-point margin is unchanged.",
+                  f"- **Flag:** joint detectability (about {md['joint_n=355_sigma=0.01_k=5']} points, ASSUMED seed sd) is above the 3-point margin, so a 3-point joint effect cannot be detected at the current test size. Test-size scenarios are costed in section 7.", ""]
     else:
         L += ["NOT RUN.", ""]
 
@@ -137,7 +138,10 @@ def main():
         L += [f"Zero-shot eval speed {b['sec_per_eval_example']} s/example ({b['sec_per_eval_example_source']}). Budget {co['budget_hours']} GPU-hours. "
               f"Extrapolation uses {b['resolution']} px, batch {b['batch']}, {b['sec_per_step']} s/step.", ""]
         L += table(["scenario", "GPU-hours", "% of budget", "fits"], [[s["name"], s["total_gpu_hours"], s["share_of_budget_pct"], s["fits_budget"]] for s in co["scenarios"]])
-        L += ["T4 numbers do not transfer to other GPUs.", ""]
+        L += ["T4 numbers do not transfer to other GPUs. Test sizes 3x and 5x multiply the evaluation items per run (7,266 now).", ""]
+        L += ["Platforms (torch labelled per platform; the full study runs on Kaggle only): " + "; ".join(
+              f"{lab}: {e.get('platform', 'colab')} torch {e.get('torch')}, {e.get('gpu')}" for lab, e in
+              (("Stage 4 zero-shot", (zs4 or {}).get("env", {})), ("Stage 5", (zs or {}).get("env", {})))), ""]
         if co.get("previous_stage4_scenarios_for_comparison"):
             L += ["Previous (Stage 4, 448 px, old grid) vs now, GPU-hours: " + "; ".join(
                 f"{o['name'][:40]}: {o['total_gpu_hours']} -> {n['total_gpu_hours']}" for o, n in zip(co["previous_stage4_scenarios_for_comparison"], co["scenarios"])), ""]
