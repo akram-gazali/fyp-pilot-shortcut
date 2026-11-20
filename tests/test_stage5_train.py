@@ -88,8 +88,8 @@ def make_lora_model():
     from peft import LoraConfig, get_peft_model
     s = load_script()
     base = TinyVLM().half()                                              # fp16 base, as on the T4
-    cfg = LoraConfig(r=4, lora_alpha=8, target_modules=s.LORA_TARGETS, autocast_adapter_dtype=True)
-    return get_peft_model(base, cfg)
+    cfg = LoraConfig(r=4, lora_alpha=8, target_modules=s.LORA_TARGETS)
+    return get_peft_model(base, cfg, autocast_adapter_dtype=True)
 
 
 def test_lora_adapters_fp32_on_fp16_base_and_scaler_step():

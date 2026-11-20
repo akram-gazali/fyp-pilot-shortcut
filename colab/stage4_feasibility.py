@@ -181,8 +181,8 @@ def add_lora(model, args, dtype):
     model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
     model.enable_input_require_grads()
     cfg = LoraConfig(r=args.lora_r, lora_alpha=2 * args.lora_r, lora_dropout=0.05, target_modules=LORA_TARGETS,
-                     task_type="CAUSAL_LM", autocast_adapter_dtype=True)   # adapters fp32 even on an fp16 base
-    model = get_peft_model(model, cfg)
+                     task_type="CAUSAL_LM")
+    model = get_peft_model(model, cfg, autocast_adapter_dtype=True)   # adapters fp32 even on an fp16 base
     rep = lora_report(model)                  # raises if adapters are not fp32 or touch the vision tower
     print(f"LoRA r={args.lora_r}: {rep}")
     return model
