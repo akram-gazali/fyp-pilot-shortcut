@@ -37,6 +37,7 @@ if not os.path.exists(DEST):
 """),
     code("""
 !pip -q install "transformers>=4.49" peft accelerate bitsandbytes
+!pip -q uninstall -y torchao   # Colab ships torchao 0.10, which peft rejects
 !pip -q install -e .
 """),
     code("""
