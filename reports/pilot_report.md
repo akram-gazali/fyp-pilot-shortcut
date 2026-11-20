@@ -78,14 +78,21 @@ Label-count checks all seeds: `{'matched_random_label_counts_identical_to_shortc
 - Strict d (both count shortcuts disagree): 96 of 1514 pool count questions; would be about 64.7 examples short per seed.
 - Count arms: shortcut_aware: gap 3.44, d=1 100.0%, objects 5.94; matched_random: gap 2.49, d=1 70.42%, objects 5.86; graded_top_gap_(diagnostic): gap 5.03, d=1 100.0%, objects 6.96
 
-## 6. Headroom: frozen model on the held-out set (Colab T4, one greedy run)
-Model `Qwen/Qwen2.5-VL-3B-Instruct`, 448 px.
+## 5b. Answer-format study on the DEV set (train split; the test set was not used to choose anything)
+NOT RUN yet (needs the GPU notebook).
+
+## 6. Headroom: frozen model on the held-out set (one greedy run)
+Model `Qwen/Qwen2.5-VL-3B-Instruct`, 448 px, method `old one-size suffix (Stage 4)`, dtype `auto (probably bf16 on T4; not recorded)`.
 - Plain accuracy, all questions: held-out 47.6% (n=500), seen 70.67% (n=1500); by template `{'compare_cs': 47.6, 'compare_shape': 71.2, 'count_cs': 93.0, 'exists_cs': 47.8}`.
 - Joint score, paired subset: held-out 2.82% (n=355), seen 43.74% (n=1278).
 - Shuffled-image control: held-out 22.2%, seen 25.73%.
-- Caveat: replies like `0` or `Yes, 1` to yes/no questions are scored wrong, so low exists/compare accuracy may be answer-format failure, not ability.
+- Caveat: replies like `0` or `Yes, 1` to yes/no questions are scored wrong, so low exists/compare accuracy may be answer-format failure, not ability (fixed in Stage 5; rerun pending).
 
-## 7. Memory and speed (Colab T4, measured; grid rows transcribed from the run log, see `grid.json`)
+**Count headroom:** frozen count_cs accuracy is 93.0%, so count has little room to improve. This is a finding to raise with the supervisor; no workaround was applied.
+
+## 7. Memory and speed (measured on the GPU named in the file)
+NOTE: this grid was transcribed by hand from a Colab log (original file lost); its dtype label was an assumption. Rerun pending.
+
 | resolution | batch | status | peak GB | sec/step |
 |---|---|---|---|---|
 | 224 | 1 | ok | 8.62 | 1.163 |
@@ -127,7 +134,8 @@ Items below come from the measurements above unless marked otherwise.
 2. **Weak shortcut contrast on count.** Matched random already has a high d=1 share on count (see section 5: shortcut arm 100% vs matched random about 70%), so the contrast is modest. Strict or graded d are options, not implemented; graded d also raises object count (a difficulty confound).
 3. **Underpowered test set.** 500 held-out scenes detect only about 6 to 8 points; the proposal is several thousand scenes. If seed sd exceeds the ceiling, no test size works (sd is ASSUMED until measured).
 4. **GPU budget.** On a T4 only batch 1 at 448 px fits; the multi-seed plan exceeds the 20 GPU-hour budget (section 7). Evaluation dominates cost. A faster GPU or a smaller evaluation is needed.
-5. **Training code never run on a GPU.** `tiny-finetune` is untested; the LoRA setup was exercised only through the grid.
-6. **Answer-format failures.** Zero-shot outputs like `0` for yes/no questions are scored wrong. This affects the headroom reading and may need a prompt change (a design-adjacent choice, not made).
+5. **Training code never run end to end on a GPU.** `tiny-finetune` is untested on a GPU. Stage 5 reviewed it (loss mask, fp32 LoRA adapters with fp16 GradScaler, seeds, manifest checks) with CPU tests only.
+6. **Answer-format failures.** Stage 4 outputs like `0` for yes/no questions were scored wrong; the Stage 5 fix is written but its GPU run is pending.
 7. **Synthetic-to-real gap and one operation combination.** One held-out combination (compare_cs) in simple 2D scenes; no claim beyond this pilot (not measured here).
-8. **Library drift.** Colab ships newer transformers/peft than local; `torchao` had to be uninstalled. Pin versions before the real runs.
+8. **Library drift.** Colab ships newer transformers/peft than local; `torchao` had to be uninstalled. `requirements-gpu.txt` pins transformers and peft only (the two measured); the rest is pinned after `scripts/freeze_env.py` runs on the GPU machine.
+9. **dtype.** The Stage 4 runs probably used emulated bf16 on the T4 (torch reported bf16 as supported); Stage 5 forces fp16 below compute capability 8.0. Stage 4 speed numbers may therefore not match Stage 5.
